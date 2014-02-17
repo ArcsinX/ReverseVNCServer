@@ -2,10 +2,15 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LIBVNCSERVER_ROOT:=LibVNCServer-0.9.9
-LIBJPEG_ROOT:=jpeg-6b
+LIBJPEG_ROOT:=../jpeg-6b
+LIBJPEG_ROOT:=../jpeg-turbo
+LIBPNG_ROOT:=../libpng-1.5.18
+OPENSSL_ROOT:=../openssl
 
 HAVE_LIBZ=1
 HAVE_LIBJPEG=1
+HAVE_LIBPNG=1
+HAVE_OPENSSL=1
 
 ifdef HAVE_LIBZ
 ZLIBSRCS := \
@@ -15,12 +20,15 @@ ZLIBSRCS := \
 	$(LIBVNCSERVER_ROOT)/libvncserver/zrlepalettehelper.c \
 	$(LIBVNCSERVER_ROOT)/common/zywrletemplate.c
 ifdef HAVE_LIBJPEG
+ifdef HAVE_LIBPNG
 TIGHTSRCS := $(LIBVNCSERVER_ROOT)/libvncserver/tight.c
+endif
 endif
 endif
 
 LOCAL_SRC_FILES:= \
-	fbvncserver.c \
+	reversevncserver.c \
+    suinput/suinput.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/main.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/rfbserver.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/rfbregion.c \
@@ -46,19 +54,50 @@ LOCAL_SRC_FILES:= \
 	$(ZLIBSRCS) \
 	$(TIGHTSRCS)
 
+ifdef HAVE_OPENSSL
+LOCAL_SRC_FILES += 	\
+    $(LIBVNCSERVER_ROOT)/libvncserver/websockets.c \
+	$(LIBVNCSERVER_ROOT)/libvncserver/rfbssl_openssl.c \
+ 	$(LIBVNCSERVER_ROOT)/libvncserver/rfbcrypto_openssl.c
+endif
+
+ifdef HAVE_LIBJPEG
+LOCAL_SRC_FILES += \
+	$(LIBVNCSERVER_ROOT)/common/turbojpeg.c
+endif
+
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/$(LIBVNCSERVER_ROOT)/libvncserver \
 	$(LOCAL_PATH)/$(LIBVNCSERVER_ROOT)/common \
-	$(LOCAL_PATH)/$(LIBVNCSERVER_ROOT) \
-	$(LOCAL_PATH)/$(LIBJPEG_ROOT)
+	$(LOCAL_PATH)/$(LIBVNCSERVER_ROOT)/rfb \
+	$(LOCAL_PATH)/$(LIBVNCSERVER_ROOT)
+
+ifdef HAVE_LIBJPEG
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/$(LIBJPEG_ROOT)
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/$(LIBJPEGTURBO_ROOT)
+endif
+ifdef HAVE_LIBPNG
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/$(LIBPNG_ROOT)
+endif
+ifdef HAVE_LIBPNG
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/$(OPENSSL_ROOT)/include
+endif
 
 ifdef HAVE_LIBZ
 LOCAL_SHARED_LIBRARIES := libz
 LOCAL_LDLIBS := -lz
 endif
+
+LOCAL_STATIC_LIBRARIES := 
 ifdef HAVE_LIBJPEG
-LOCAL_STATIC_LIBRARIES := libjpeg
+LOCAL_STATIC_LIBRARIES += libjpeg
+endif
+ifdef HAVE_LIBPNG
+LOCAL_STATIC_LIBRARIES += libpng libssl_static libcrypto_static
+endif
+ifdef HAVE_OPENSSL
+LOCAL_STATIC_LIBRARIES += libssl_static libcrypto_static
 endif
 
 LOCAL_MODULE:= reversevncserver
