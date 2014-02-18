@@ -28,7 +28,6 @@ endif
 
 LOCAL_SRC_FILES:= \
 	reversevncserver.c \
-    suinput/suinput.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/main.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/rfbserver.c \
 	$(LIBVNCSERVER_ROOT)/libvncserver/rfbregion.c \
