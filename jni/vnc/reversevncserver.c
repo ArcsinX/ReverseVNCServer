@@ -29,8 +29,7 @@
 #include "rfb/rfb.h"
 #include "rfb/keysym.h"
 
-/* Convenience constants. */
-/*****************************************************************************/
+#include <android/keycodes.h>
 
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
@@ -38,18 +37,120 @@
 /* Android already has 5900 bound natively. */
 #define VNC_PORT 5901
 
-/*****************************************************************************/
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
 
-static void keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl);
-static void ptrevent(int buttonMask, int x, int y, rfbClientPtr cl);
+static void
+injectKeyEvent(int code, int done)
+{
+    if (done)
+    {
+        char keyevent_cmd[256];
+        sprintf(keyevent_cmd, "input keyevent %d", code);
+        system(keyevent_cmd);
 
-/*****************************************************************************/
+#if 1
+        printf("injectKeyEvent code=%d\n", code);
+#endif
+    }
+}
+
+static int
+keysym2scancode(rfbKeySym key, rfbClientPtr cl)
+{
+    int scancode = 0;
+
+    int code = (int)key;
+    switch (code)
+    {
+        case 0xFF51:    scancode = AKEYCODE_DPAD_LEFT;       break; // left 
+        case 0xFF53:    scancode = AKEYCODE_DPAD_RIGHT;      break; // right
+        case 0xFF54:    scancode = AKEYCODE_DPAD_DOWN;       break; // down
+        case 0xFF52:    scancode = AKEYCODE_DPAD_UP;         break; // up
+        case 0xFF08:    scancode = AKEYCODE_BACK;            break; // Backspace
+        case 0xFF1B:    scancode = AKEYCODE_BACK;            break; // ESC
+        case 0xFF50:    scancode = AKEYCODE_HOME;            break; // Home
+        case 0xFF55:    scancode = AKEYCODE_MENU;            break; // PgUp
+        case 0xFFC0:    scancode = AKEYCODE_SEARCH;          break; // F3
+        case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
+        case 0xFFC9:    exit(0);                             break; // F12
+    }
+
+    return scancode;
+} 
+
 
 static void
 keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
+	int scancode;
+
+#if 1
+	printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
+#endif
+
+	if ((scancode = keysym2scancode(key, cl)))
+	{
+		injectKeyEvent(scancode, down);
+	} 
 
 }
+
+static void
+injectTapEvent(int x, int y)
+{
+    char tap_cmd[256];
+    sprintf(tap_cmd, "input tap %d %d", x, y);
+    system(tap_cmd);
+
+#if 1
+    printf("injectTapEvent (x=%d, y=%d)\n", x, y);
+#endif
+}
+
+static void
+injectSwipeEvent(int x1, int y1, int x2, int y2)
+{
+    char swipe_cmd[256];
+    sprintf(swipe_cmd, "input swipe %d %d %d %d", x1, y1, x2, y2);
+    system(swipe_cmd);
+
+#if 1
+    printf("injectSwipeEvent (x1=%d, y1=%d, x2=%d, y2=%d)\n",
+           x1, y1, x2, y2);
+#endif
+}
+
+
+static void
+ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
+{
+    static int clicked = 0;
+    static int prev_x, prev_y;
+
+    if ((buttonMask & 1) && clicked)
+        return;
+
+	if(buttonMask & 1)
+    {
+        prev_x = x;
+        prev_y = y;
+        clicked = 1;
+	} 
+    else if (clicked)
+    {
+        if (x == prev_x && y == prev_y)
+    		injectTapEvent(x, y);
+        else
+            injectSwipeEvent(prev_x, prev_y, x, y);
+        clicked = 0;
+    }
+}
+
 
 void
 extract_host_port(char *str, char *rhost, int *rport)
@@ -177,35 +278,6 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     return vncscr;
 }
 
-
-static void
-injectTapEvent(int x, int y)
-{
-    char tap_cmd[256];
-    sprintf(tap_cmd, "input tap %d %d", x, y);
-    system(tap_cmd);
-
-    printf("injectTapEvent (x=%d, y=%d)\n", x, y);
-}
-
-static void
-ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
-{
-    static int clicked = 0;
-    if ((buttonMask & 1) && clicked)
-        return;
-
-	if(buttonMask & 1)
-    {
-		injectTapEvent(x, y);
-        clicked = 1;
-	} 
-    else
-    {
-        clicked = 0;
-    }
-}
-
 static void
 update_fb_info(int fbfd, struct fb_var_screeninfo *scrinfo)
 {
@@ -234,12 +306,12 @@ readFrameBuffer(int fbfd, unsigned short int *fbmmap,
 #include "updatescreen.c"
 #undef OUT
 
-/*****************************************************************************/
-
 void print_usage(char **argv)
 {
-    puts("%s [-h] [-c host:port]\n"
+    puts("%s [-h] [-c host:port] [-r] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
+        "-r : reconnect on reverse connections lost\n"
+        "-p localport : Local port for incoming connections. Default if 5901\n"
         "-h : print this help");
 }
 
@@ -255,6 +327,8 @@ int main(int argc, char **argv)
     char rhost[256] = {0};
     int  rport = 5500;
     int  port = 5901;
+    rfbClientPtr reverse_client = NULL;
+    int  reconnect_on_lost = FALSE;
 
     rfbScreenInfoPtr vncscr;
 
@@ -285,6 +359,10 @@ int main(int argc, char **argv)
                     case 'p':
                         i++;
                         port = atoi(argv[i]);
+                        break;
+                    case 'r':
+                        i++;
+                        reconnect_on_lost = TRUE;
                         break;
 				}
 			}
@@ -319,24 +397,46 @@ int main(int argc, char **argv)
 
     if (rhost[0] != '\0')
     {
-        rfbClientPtr cl;
-        cl = rfbReverseConnection(vncscr, rhost, rport);
-        if (cl == NULL)
-        {
-            printf("Couldn't connect to remote host: %s at port %d\n",rhost, rport);
-        }
+        reverse_client = rfbReverseConnection(vncscr, rhost, rport);
+        if (reverse_client == NULL)
+            printf("Couldn't connect to remote host: %s at port %d\n",
+                   rhost, rport);
         else
         {
-            cl->onHold = FALSE;
-            rfbStartOnHoldClient(cl);
+            reverse_client->onHold = FALSE;
+            rfbStartOnHoldClient(reverse_client);
         }
     }
 
-	/* Implement our own event loop to detect changes in the framebuffer. */
 	while (1)
 	{
-		while (vncscr->clientHead == NULL)
-			rfbProcessEvents(vncscr, 10000);
+        /* Reconnectio on reverse connection lost */
+        if (reverse_client && reconnect_on_lost)
+        {
+            rfbClientPtr cl;
+
+            for (cl = vncscr->clientHead;
+                 cl != NULL && cl != reverse_client;
+                 cl = cl->next);
+
+            if (cl == NULL || cl->sock == -1)
+            {
+                cl = rfbReverseConnection(vncscr, rhost, rport);
+                if (cl == NULL)
+                    printf("Couldn't connect to remote host: %s at port %d\n",
+                           rhost, rport);
+                else
+                {
+                    reverse_client = cl;
+                    reverse_client->onHold = FALSE;
+                    rfbStartOnHoldClient(reverse_client);
+                }
+            }
+        }
+
+        if (!reverse_client)
+    		while (vncscr->clientHead == NULL)
+	    		rfbProcessEvents(vncscr, 10000);
 
 		rfbProcessEvents(vncscr, 10000);
 		update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo);
