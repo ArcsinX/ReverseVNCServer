@@ -53,7 +53,7 @@ injectKeyEvent(int code, int done)
         sprintf(keyevent_cmd, "input keyevent %d", code);
         system(keyevent_cmd);
 
-#if 1
+#if 0
         printf("injectKeyEvent code=%d\n", code);
 #endif
     }
@@ -76,6 +76,7 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
         case 0xFF50:    scancode = AKEYCODE_HOME;            break; // Home
         case 0xFF55:    scancode = AKEYCODE_MENU;            break; // PgUp
         case 0xFFC0:    scancode = AKEYCODE_SEARCH;          break; // F3
+        case 0xFFC7:    scancode = AKEYCODE_POWER;           break; // F10
         case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
         case 0xFFC9:    exit(0);                             break; // F12
     }
@@ -89,7 +90,7 @@ keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
 	int scancode;
 
-#if 1
+#if 0
 	printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
@@ -107,7 +108,7 @@ injectTapEvent(int x, int y)
     sprintf(tap_cmd, "input tap %d %d", x, y);
     system(tap_cmd);
 
-#if 1
+#if 0
     printf("injectTapEvent (x=%d, y=%d)\n", x, y);
 #endif
 }
@@ -119,7 +120,7 @@ injectSwipeEvent(int x1, int y1, int x2, int y2)
     sprintf(swipe_cmd, "input swipe %d %d %d %d", x1, y1, x2, y2);
     system(swipe_cmd);
 
-#if 1
+#if 0
     printf("injectSwipeEvent (x1=%d, y1=%d, x2=%d, y2=%d)\n",
            x1, y1, x2, y2);
 #endif
