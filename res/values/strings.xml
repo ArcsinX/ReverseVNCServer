@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Reverse VNC Server</string>
+    <string name="action_settings">Settings</string>
+    <string name="textView1Value">Reverse connection host:port</string>
+    <string name="textView2Value">Port</string>
+    <string name="reconnectStatic">Reconnect on connection lost</string>
+    <string name="startstopButtonText">Start</string>
+
+</resources>
