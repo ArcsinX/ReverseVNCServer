@@ -25,7 +25,7 @@
         android:layout_alignLeft="@+id/textView1"
         android:layout_below="@+id/textView1"
         android:layout_marginTop="44dp"
-        android:text="@string/textView1Value"
+        android:text="@string/textView2Value"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <EditText

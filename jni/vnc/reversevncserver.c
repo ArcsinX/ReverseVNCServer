@@ -271,6 +271,8 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     vncscr->serverFormat.trueColour = TRUE; 
     vncscr->serverFormat.bitsPerPixel = scrinfo->bits_per_pixel;
 
+    vncscr->deferUpdateTime = 5;
+
     rfbInitServer(vncscr);
 
     /* Mark as dirty since we haven't sent any updates at all yet. */
@@ -309,11 +311,11 @@ readFrameBuffer(int fbfd, unsigned short int *fbmmap,
 
 void print_usage(char **argv)
 {
-    puts("%s [-h] [-c host:port] [-r] [-p localport]\n"
+    printf("%s [-h] [-c host:port] [-r] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
         "-r : reconnect on reverse connections lost\n"
         "-p localport : Local port for incoming connections. Default if 5901\n"
-        "-h : print this help");
+        "-h : print this help", argv[0]);
 }
 
 int main(int argc, char **argv)
@@ -437,9 +439,9 @@ int main(int argc, char **argv)
 
         if (!reverse_client)
     		while (vncscr->clientHead == NULL)
-	    		rfbProcessEvents(vncscr, 10000);
+	    		rfbProcessEvents(vncscr, 5000);
 
-		rfbProcessEvents(vncscr, 10000);
+		rfbProcessEvents(vncscr, 5000);
 		update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo);
 	}
 
