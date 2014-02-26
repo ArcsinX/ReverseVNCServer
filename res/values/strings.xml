@@ -7,5 +7,9 @@
     <string name="textView2Value">Port</string>
     <string name="reconnectStatic">Reconnect on connection lost</string>
     <string name="startstopButtonText">Start</string>
+    <string name="viewonlyStatic">View only</string>
+    <string name="vncConnectStr"></string>
+    <string name="httpConnectStr"></string>
+    <string name="version">1.1</string>
 
 </resources>

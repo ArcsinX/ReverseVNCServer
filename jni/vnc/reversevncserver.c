@@ -44,6 +44,8 @@
 #define FALSE 0
 #endif
 
+int viewOnly = FALSE;
+
 static void
 injectKeyEvent(int code, int done)
 {
@@ -239,6 +241,14 @@ cleanup_fb(int fbfd)
 	}
 }
 
+static enum rfbNewClientAction
+newVncClient(rfbClientPtr cl)
+{
+  cl->viewOnly = viewOnly;
+
+  return RFB_CLIENT_ACCEPT;
+}
+
 static rfbScreenInfoPtr
 init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
                  unsigned short int *vncbuf)
@@ -272,6 +282,8 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     vncscr->serverFormat.bitsPerPixel = scrinfo->bits_per_pixel;
 
     vncscr->deferUpdateTime = 5;
+
+    vncscr->newClientHook = newVncClient;
 
     rfbInitServer(vncscr);
 
@@ -311,9 +323,10 @@ readFrameBuffer(int fbfd, unsigned short int *fbmmap,
 
 void print_usage(char **argv)
 {
-    printf("%s [-h] [-c host:port] [-r] [-p localport]\n"
+    printf("%s [-h] [-c host:port] [-r] [-v] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
         "-r : reconnect on reverse connections lost\n"
+        "-v : view only\n"
         "-p localport : Local port for incoming connections. Default if 5901\n"
         "-h : print this help", argv[0]);
 }
@@ -367,6 +380,10 @@ int main(int argc, char **argv)
                         i++;
                         reconnect_on_lost = TRUE;
                         break;
+                    case 'v':
+                        i++;
+                        viewOnly = TRUE;
+                        break;
 				}
 			}
 			i++;
@@ -408,6 +425,7 @@ int main(int argc, char **argv)
         {
             reverse_client->onHold = FALSE;
             rfbStartOnHoldClient(reverse_client);
+            reverse_client->viewOnly = viewOnly;
         }
     }
 
@@ -433,15 +451,16 @@ int main(int argc, char **argv)
                     reverse_client = cl;
                     reverse_client->onHold = FALSE;
                     rfbStartOnHoldClient(reverse_client);
+                    reverse_client->viewOnly = viewOnly;
                 }
             }
         }
 
         if (!reverse_client)
     		while (vncscr->clientHead == NULL)
-	    		rfbProcessEvents(vncscr, 5000);
+	    		rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
-		rfbProcessEvents(vncscr, 5000);
+		rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 		update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo);
 	}
 

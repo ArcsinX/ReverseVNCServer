@@ -40,16 +40,6 @@
         <requestFocus />
     </EditText>
 
-    <CheckBox
-        android:id="@+id/reconnect_checkbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/port_edit"
-        android:layout_alignParentRight="true"
-        android:layout_below="@+id/port_edit"
-        android:layout_marginTop="30dp"
-        android:text="@string/reconnectStatic" />
-
     <Button
         android:id="@+id/startstop_button"
         android:layout_width="wrap_content"
@@ -69,5 +59,40 @@
         android:layout_below="@+id/textView2"
         android:ems="10"
         android:inputType="number" />
+
+    <CheckBox
+        android:id="@+id/viewonly_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/reconnect_checkbox"
+        android:layout_below="@+id/reconnect_checkbox"
+        android:text="@string/viewonlyStatic" />
+
+    <CheckBox
+        android:id="@+id/reconnect_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/port_edit"
+        android:layout_below="@+id/port_edit"
+        android:text="@string/reconnectStatic" />
+
+    <TextView
+        android:id="@+id/vncConnectStatic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/viewonly_checkbox"
+        android:layout_below="@+id/viewonly_checkbox"
+        android:layout_marginTop="17dp"
+        android:text="@string/vncConnectStr"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/httpConnectStatic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/viewonly_checkbox"
+        android:layout_below="@+id/vncConnectStatic"
+        android:text="@string/httpConnectStr"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
 
 </RelativeLayout>
