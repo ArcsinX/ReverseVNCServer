@@ -44,7 +44,8 @@
 #define FALSE 0
 #endif
 
-int viewOnly = FALSE;
+int viewOnly     = FALSE;
+int scalePercent = 100;
 
 static void
 injectKeyEvent(int code, int done)
@@ -236,17 +237,22 @@ static void
 cleanup_fb(int fbfd)
 {
 	if(fbfd != -1)
-	{
 		close(fbfd);
-	}
 }
 
 static enum rfbNewClientAction
 newVncClient(rfbClientPtr cl)
 {
-  cl->viewOnly = viewOnly;
 
-  return RFB_CLIENT_ACCEPT;
+    if (scalePercent != 100)
+    {
+        rfbScalingSetup(cl,
+                        cl->screen->width  * scalePercent / 100,
+                        cl->screen->height * scalePercent / 100);
+    }
+    cl->viewOnly = viewOnly;
+
+    return RFB_CLIENT_ACCEPT;
 }
 
 static rfbScreenInfoPtr
@@ -264,7 +270,7 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     vncscr->desktopName = "Android";
     vncscr->frameBuffer = (char *)vncbuf;
     vncscr->alwaysShared = TRUE;
-    vncscr->httpDir = NULL;
+    vncscr->httpDir = "webclients/";
     vncscr->port = port;
 
     vncscr->kbdAddEvent = keyevent;
@@ -327,7 +333,8 @@ void print_usage(char **argv)
         "-c host:port : Reverse connection host and port\n"
         "-r : reconnect on reverse connections lost\n"
         "-v : view only\n"
-        "-p localport : Local port for incoming connections. Default if 5901\n"
+        "-p localport : Local port for incoming connections (default is 5901)\n"
+        "-s scale : scale percent (default is 100)\n"
         "-h : print this help", argv[0]);
 }
 
@@ -384,6 +391,10 @@ int main(int argc, char **argv)
                         i++;
                         viewOnly = TRUE;
                         break;
+                    case 's':
+                        i++;
+                        scalePercent = atoi(argv[i]);
+                        break;
 				}
 			}
 			i++;
@@ -405,6 +416,7 @@ int main(int argc, char **argv)
 	printf("	height: %d\n", (int)scrinfo.yres);
 	printf("	bpp:    %d\n", (int)scrinfo.bits_per_pixel);
 	printf("	port:   %d\n", port);
+    printf("	scale:  %d\n", scalePercent);
 
     if (vncscr->serverFormat.bitsPerPixel == 32)
         update_screen = update_screen_32;
@@ -425,7 +437,7 @@ int main(int argc, char **argv)
         {
             reverse_client->onHold = FALSE;
             rfbStartOnHoldClient(reverse_client);
-            reverse_client->viewOnly = viewOnly;
+            (void)newVncClient(reverse_client);
         }
     }
 
@@ -451,7 +463,7 @@ int main(int argc, char **argv)
                     reverse_client = cl;
                     reverse_client->onHold = FALSE;
                     rfbStartOnHoldClient(reverse_client);
-                    reverse_client->viewOnly = viewOnly;
+                    (void)newVncClient(reverse_client);
                 }
             }
         }
