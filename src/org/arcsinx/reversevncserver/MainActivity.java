@@ -13,6 +13,7 @@ import java.util.zip.ZipInputStream;
 import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.util.concurrent.TimeUnit;
 
 import android.os.Bundle;
 import android.app.Activity;
@@ -350,6 +351,19 @@ public class MainActivity extends Activity {
 				}
 				catch (Exception e)
 				{}
+			}
+			// wait 1 secons and check if process appears
+			if (serverStarted)
+			{	
+				try
+				{
+					TimeUnit.SECONDS.sleep(1);
+				}
+				catch (Exception e)
+				{
+				}
+				if (!checkIfRunning())
+					serverStarted = false;
 			}
 			if (serverStarted)
 			{	

@@ -15,7 +15,8 @@
         android:layout_below="@+id/textView1"
         android:ems="8"
         android:singleLine="true"
-        android:textAppearance="?android:attr/textAppearanceSmall" >
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:imeOptions="actionDone" >
     </EditText>
 
     <CheckBox
@@ -63,7 +64,8 @@
         android:ems="8"
         android:inputType="number"
         android:singleLine="true"
-        android:textAppearance="?android:attr/textAppearanceSmall" >
+        android:textAppearance="?android:attr/textAppearanceSmall"
+        android:imeOptions="actionDone" >
     </EditText>
 
     <CheckBox
@@ -104,7 +106,8 @@
         android:ems="8"
         android:inputType="number"
         android:singleLine="true"
-        android:textAppearance="?android:attr/textAppearanceSmall" >
+        android:textAppearance="?android:attr/textAppearanceSmall" 
+        android:imeOptions="actionDone" >
     </EditText>
 
     <TextView
