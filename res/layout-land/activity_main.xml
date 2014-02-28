@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".MainActivity" >
+
+   <EditText
+        android:id="@+id/reversehostport_edit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/textView1"
+        android:ems="8"
+        android:singleLine="true"
+        android:textAppearance="?android:attr/textAppearanceSmall" >
+    </EditText>
+
+    <CheckBox
+        android:id="@+id/viewonly_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/reconnect_checkbox"
+        android:layout_below="@+id/reconnect_checkbox"
+        android:text="@string/viewonlyStatic"
+        android:textAppearance="?android:attr/textAppearanceSmall"/>
+
+    <TextView
+        android:id="@+id/vncConnectStatic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/viewonly_checkbox"
+        android:layout_below="@+id/viewonly_checkbox"
+        android:text="@string/vncConnectStr"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/httpConnectStatic"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/viewonly_checkbox"
+        android:layout_below="@+id/vncConnectStatic"
+        android:text="@string/httpConnectStr"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/textView1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/reversehostport_edit"
+        android:layout_alignParentTop="true"
+        android:text="@string/textView1Value"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+   <EditText
+        android:id="@+id/port_edit"
+        android:layout_width="60dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/reversehostport_edit"
+        android:layout_toRightOf="@+id/textView2"
+        android:ems="8"
+        android:inputType="number"
+        android:singleLine="true"
+        android:textAppearance="?android:attr/textAppearanceSmall" >
+    </EditText>
+
+    <CheckBox
+        android:id="@+id/reconnect_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/textView2"
+        android:layout_below="@+id/port_edit"
+        android:text="@string/reconnectStatic"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/port_edit"
+        android:layout_alignBottom="@+id/port_edit"
+        android:layout_alignLeft="@+id/reversehostport_edit"
+        android:text="@string/textView2Value"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/textView3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/port_edit"
+        android:layout_alignBottom="@+id/port_edit"
+        android:layout_toRightOf="@+id/port_edit"
+        android:text="@string/textView3Value"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <EditText
+        android:id="@+id/scale_edit"
+        android:layout_width="60dp"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@+id/port_edit"
+        android:layout_toRightOf="@+id/textView3"
+        android:ems="8"
+        android:inputType="number"
+        android:singleLine="true"
+        android:textAppearance="?android:attr/textAppearanceSmall" >
+    </EditText>
+
+    <TextView
+        android:id="@+id/textView4"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/scale_edit"
+        android:layout_alignBottom="@+id/scale_edit"
+        android:layout_toRightOf="@+id/scale_edit"
+        android:text="%"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <Button
+        android:id="@+id/startstop_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/vncConnectStatic"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/scale_edit"
+        android:layout_toRightOf="@+id/reconnect_checkbox"
+        android:onClick="starStopServer"
+        android:text="@string/startstopButtonText" />
+
+</RelativeLayout>

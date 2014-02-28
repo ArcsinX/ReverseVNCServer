@@ -97,7 +97,6 @@ public class MainActivity extends Activity {
 			InputStream ins = getResources().openRawResource(id);
 			int size = ins.available();
 
-			// Read the entire resource into a local byte buffer.
 			byte[] buffer = new byte[size];
 			ins.read(buffer);
 			ins.close();
@@ -233,8 +232,8 @@ public class MainActivity extends Activity {
 			}
 
 			
-			vnc_connect_text.setText(getIpAddress() + ":" + port);
-			http_connect_text.setText("http://" + getIpAddress() + ":" + http_port);
+			vnc_connect_text.setText("VNC viewer connect to: " + getIpAddress() + ":" + port);
+			http_connect_text.setText("VNC via browser: " + "http://" + getIpAddress() + ":" + http_port);
 			startStopButton.setText("Stop");
 			serverStarted = true;
 		}
@@ -306,7 +305,14 @@ public class MainActivity extends Activity {
 				reversevncserver_cmd += " -p " + port;
 			String scale = scale_edit.getText().toString();
 			if (!scale.isEmpty())
+			{
+				int scale_int = Integer.parseInt(scale);
+				if (scale_int > 100)
+					scale = "100";
+				
 				reversevncserver_cmd += " -s " + scale;
+				
+			}
 			
 		    String reverse_hostport = reverse_hostport_edit.getText().toString();
 		    if (!reverse_hostport.isEmpty())
@@ -363,12 +369,12 @@ public class MainActivity extends Activity {
 				}
 
 				
-				vnc_connect_text.setText(getIpAddress() + ":" + port);
-				http_connect_text.setText("http://" + getIpAddress() + ":" + http_port);
+				vnc_connect_text.setText("VNC viewer connect to: " + getIpAddress() + ":" + port);
+				http_connect_text.setText("VNC via browser: " +  "http://" + getIpAddress() + ":" + http_port);
 				startStopButton.setText("Stop");	
 			}
 			else
-				vnc_connect_text.setText("Failed to start server");
+				vnc_connect_text.setText("Failed to start VNC server");
 			
 			SharedPreferences.Editor e = prefs.edit();
 			
