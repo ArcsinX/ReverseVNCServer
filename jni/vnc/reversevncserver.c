@@ -15,12 +15,6 @@
 #include <string.h>
 
 #include <unistd.h>
-#include <sys/mman.h>
-#include <sys/ioctl.h>
-
-
-#include <fcntl.h>
-#include <linux/fb.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -31,8 +25,7 @@
 
 #include <android/keycodes.h>
 
-/* Android does not use /dev/fb0. */
-#define FB_DEVICE "/dev/graphics/fb0"
+#include "framebuffer.h"
 
 /* Android already has 5900 bound natively. */
 #define VNC_PORT 5901
@@ -91,16 +84,16 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
 static void
 keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
-	int scancode;
+    int scancode;
 
 #if 0
-	printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
+    printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
-	if ((scancode = keysym2scancode(key, cl)))
-	{
-		injectKeyEvent(scancode, down);
-	} 
+    if ((scancode = keysym2scancode(key, cl)))
+    {
+        injectKeyEvent(scancode, down);
+    }
 
 }
 
@@ -139,16 +132,16 @@ ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
     if ((buttonMask & 1) && clicked)
         return;
 
-	if(buttonMask & 1)
+    if(buttonMask & 1)
     {
         prev_x = x;
         prev_y = y;
         clicked = 1;
-	} 
+    } 
     else if (clicked)
     {
         if (x == prev_x && y == prev_y)
-    		injectTapEvent(x, y);
+            injectTapEvent(x, y);
         else
             injectSwipeEvent(prev_x, prev_y, x, y);
         clicked = 0;
@@ -179,65 +172,6 @@ extract_host_port(char *str, char *rhost, int *rport)
         }
         *p = '\0';
     } 
-}
-
-
-static int
-init_fb(struct fb_var_screeninfo *scrinfo,
-        struct fb_fix_screeninfo *fscrinfo,
-        unsigned short **fbmmap)
-{
-	size_t pixels;
-	size_t bytespp;
-    int fbfd;
-
-	if ((fbfd = open(FB_DEVICE, O_RDONLY)) == -1)
-	{
-		printf("cannot open fb device %s\n", FB_DEVICE);
-		exit(EXIT_FAILURE);
-	}
-
-	if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
-	{
-		printf("ioctl error\n");
-		exit(EXIT_FAILURE);
-	}
-
-    if (ioctl(fbfd, FBIOGET_FSCREENINFO, fscrinfo) != 0)
-    {
-        printf("ioctl error\n");
-        exit(EXIT_FAILURE);
-    }
-
-	pixels = scrinfo->xres * scrinfo->yres;
-	bytespp = scrinfo->bits_per_pixel / 8;
-
-	printf("Screen info: xres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n", 
-	  (int)scrinfo->xres, (int)scrinfo->yres,
-	  (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
-	  (int)scrinfo->xoffset, (int)scrinfo->yoffset,
-	  (int)scrinfo->bits_per_pixel);
-
-    size_t yres = scrinfo->yres * 2 > scrinfo->yres_virtual ?
-                  scrinfo->yres * 2 :
-                  scrinfo->yres_virtual;
-    size_t fb_size = fscrinfo->line_length * yres;
-
-	*fbmmap = mmap(NULL, fb_size, PROT_READ, MAP_SHARED, fbfd, 0);
-	if (*fbmmap == MAP_FAILED)
-	{
-		printf("mmap failed\n");
-		exit(EXIT_FAILURE);
-	}
-
-    return fbfd;
-}
-
-static void
-cleanup_fb(int fbfd)
-{
-	if(fbfd != -1)
-		close(fbfd);
 }
 
 static enum rfbNewClientAction
@@ -299,24 +233,6 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     return vncscr;
 }
 
-static void
-update_fb_info(int fbfd, struct fb_var_screeninfo *scrinfo)
-{
-    if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
-    {
-        printf("ioctl error\n");
-        exit(EXIT_FAILURE);
-    }
-}
-
-static unsigned int *
-readFrameBuffer(int fbfd, unsigned short int *fbmmap,
-                struct fb_var_screeninfo *scrinfo)
-{
-  update_fb_info(fbfd, scrinfo);
-  return (unsigned int *)fbmmap;
-}
-
 #define OUT 32
 #include "updatescreen.c"
 #undef OUT
@@ -340,7 +256,7 @@ void print_usage(char **argv)
 
 int main(int argc, char **argv)
 {
-    void (*update_screen)(rfbScreenInfoPtr,
+    int (*update_screen)(rfbScreenInfoPtr,
          int,
          unsigned short int *,
          unsigned short int *,
@@ -362,23 +278,23 @@ int main(int argc, char **argv)
     unsigned short int      *fbbuf;
     unsigned short int      *vncbuf;
 
-	if(argc > 1)
-	{
-		int i=1;
-		while(i < argc)
-		{
-			if(*argv[i] == '-')
-			{
-				switch(*(argv[i] + 1))
-				{
-					case 'h':
-						print_usage(argv);
-						exit(0);
-						break;
-					case 'c':
-						i++;
+    if (argc > 1)
+    {
+        int i = 1;
+        while (i < argc)
+        {
+            if(*argv[i] == '-')
+            {
+                switch(*(argv[i] + 1))
+                {
+                    case 'h':
+                        print_usage(argv);
+                        exit(0);
+                        break;
+                    case 'c':
+                        i++;
                         extract_host_port(argv[i], rhost, &rport);
-						break;
+                        break;
                     case 'p':
                         i++;
                         port = atoi(argv[i]);
@@ -395,27 +311,31 @@ int main(int argc, char **argv)
                         i++;
                         scalePercent = atoi(argv[i]);
                         break;
-				}
-			}
-			i++;
-		}
-	}
+                }
+            }
+            i++;
+        }
+    }
 
-	printf("Initializing framebuffer device " FB_DEVICE "...\n");
-	fbfd = init_fb(&scrinfo, &fscrinfo, &fbmmap);
+    fbfd = init_fb(&scrinfo, &fscrinfo, &fbmmap);
+    if (fbfd == -1)
+    {
+        puts("Failed to initialize frame buffer");
+        exit(EXIT_FAILURE);
+    }
 
-	vncbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
-	assert(vncbuf != NULL);
-	fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
-	assert(fbbuf != NULL);
+    vncbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
+    assert(vncbuf != NULL);
+    fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
+    assert(fbbuf != NULL);
 
-	vncscr = init_vnc_server(port, &scrinfo, vncbuf);
+    vncscr = init_vnc_server(port, &scrinfo, vncbuf);
 
-	printf("Initializing VNC server:\n");
-	printf("	width:  %d\n", (int)scrinfo.xres);
-	printf("	height: %d\n", (int)scrinfo.yres);
-	printf("	bpp:    %d\n", (int)scrinfo.bits_per_pixel);
-	printf("	port:   %d\n", port);
+    printf("Initializing VNC server:\n");
+    printf("	width:  %d\n", (int)scrinfo.xres);
+    printf("	height: %d\n", (int)scrinfo.yres);
+    printf("	bpp:    %d\n", (int)scrinfo.bits_per_pixel);
+    printf("	port:   %d\n", port);
     printf("	scale:  %d\n", scalePercent);
 
     if (vncscr->serverFormat.bitsPerPixel == 32)
@@ -441,8 +361,8 @@ int main(int argc, char **argv)
         }
     }
 
-	while (1)
-	{
+    while (1)
+    {
         /* Reconnectio on reverse connection lost */
         if (reverse_client && reconnect_on_lost)
         {
@@ -469,15 +389,19 @@ int main(int argc, char **argv)
         }
 
         if (!reverse_client)
-    		while (vncscr->clientHead == NULL)
-	    		rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
+            while (vncscr->clientHead == NULL)
+                rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
-		rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
-		update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo);
-	}
+        rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
+        if (update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo) == -1)
+        {
+            puts("Failed to update screen");
+            exit(EXIT_FAILURE);
+        }
+    }
 
-	printf("Cleaning up...\n");
-	cleanup_fb(fbfd);
+    printf("Cleaning up...\n");
+    cleanup_fb(fbfd);
     free(vncbuf);
     free(fbbuf);
 }

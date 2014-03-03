@@ -30,7 +30,7 @@ Lesser General Public License for more details.
 #define PIXEL_TO_VIRTUALPIXEL_FB(i,j) ((j+scrinfo->yoffset)*scrinfo->xres_virtual+i+scrinfo->xoffset)
 #endif
 
-static void
+static int
 FUNCTION(rfbScreenInfoPtr vncscr,
          int fbfd,
          unsigned short int *fbbuf,
@@ -45,6 +45,9 @@ FUNCTION(rfbScreenInfoPtr vncscr,
 
     OUT_T* a = (OUT_T*)fbbuf;
     OUT_T* b = (OUT_T*)readFrameBuffer(fbfd, fbmmap, scrinfo);
+
+    if (b == NULL)
+        return -1;
 
     for (j = 0; j < vncscr->height; j++)
     {
@@ -80,5 +83,7 @@ FUNCTION(rfbScreenInfoPtr vncscr,
 
         rfbMarkRectAsModified(vncscr, min_x, min_y, max_x, max_y);
     }
+
+    return 0;
 }
 
