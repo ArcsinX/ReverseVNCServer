@@ -19,6 +19,12 @@
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
 
+static inline int
+align_size(int size)
+{
+    return (size + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
+}
+
 int
 init_fb(struct fb_var_screeninfo *scrinfo,
         struct fb_fix_screeninfo *fscrinfo,
@@ -30,7 +36,7 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 
 	printf("Initializing framebuffer device " FB_DEVICE "...\n");
 
-	if ((fbfd = open(FB_DEVICE, O_RDONLY)) == -1)
+	if ((fbfd = open(FB_DEVICE, O_RDWR)) == -1)
 	{
 		printf("cannot open fb device %s\n", FB_DEVICE);
 		return -1;
@@ -53,18 +59,21 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 	pixels = scrinfo->xres * scrinfo->yres;
 	bytespp = scrinfo->bits_per_pixel / 8;
 
-	printf("Screen info: xres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n", 
-	  (int)scrinfo->xres, (int)scrinfo->yres,
-	  (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
-	  (int)scrinfo->xoffset, (int)scrinfo->yoffset,
-	  (int)scrinfo->bits_per_pixel);
-
     size_t yres = scrinfo->yres * 2 > scrinfo->yres_virtual ?
                   scrinfo->yres * 2 :
                   scrinfo->yres_virtual;
     size_t fb_size = fscrinfo->line_length * yres;
 
-	*fbmmap = mmap(NULL, fb_size, PROT_READ, MAP_SHARED, fbfd, 0);
+	printf("Screen info: xres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n"
+           "\tline_length=%d, fb_size=%d, align_size(fb_size)=%d\n",
+	  (int)scrinfo->xres, (int)scrinfo->yres,
+	  (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
+	  (int)scrinfo->xoffset, (int)scrinfo->yoffset,
+	  (int)scrinfo->bits_per_pixel,
+      (int)fscrinfo->line_length, (int)fb_size, align_size(fb_size));
+
+
+	*fbmmap = mmap(NULL, align_size(fb_size), PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
 	if (*fbmmap == MAP_FAILED)
 	{
 		printf("mmap failed\n");
