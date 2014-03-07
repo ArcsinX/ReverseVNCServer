@@ -15,6 +15,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
@@ -28,7 +29,7 @@ align_size(int size)
 int
 init_fb(struct fb_var_screeninfo *scrinfo,
         struct fb_fix_screeninfo *fscrinfo,
-        unsigned short **fbmmap)
+        unsigned short **fbmmap, int *fb_size)
 {
 	size_t pixels;
 	size_t bytespp;
@@ -36,7 +37,7 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 
 	printf("Initializing framebuffer device " FB_DEVICE "...\n");
 
-	if ((fbfd = open(FB_DEVICE, O_RDWR)) == -1)
+	if ((fbfd = open(FB_DEVICE, O_RDONLY)) == -1)
 	{
 		printf("cannot open fb device %s\n", FB_DEVICE);
 		return -1;
@@ -62,7 +63,7 @@ init_fb(struct fb_var_screeninfo *scrinfo,
     size_t yres = scrinfo->yres * 2 > scrinfo->yres_virtual ?
                   scrinfo->yres * 2 :
                   scrinfo->yres_virtual;
-    size_t fb_size = fscrinfo->line_length * yres;
+    *fb_size = fscrinfo->line_length * yres;
 
 	printf("Screen info: xres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n"
            "\tline_length=%d, fb_size=%d, align_size(fb_size)=%d\n",
@@ -70,16 +71,25 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 	  (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
 	  (int)scrinfo->xoffset, (int)scrinfo->yoffset,
 	  (int)scrinfo->bits_per_pixel,
-      (int)fscrinfo->line_length, (int)fb_size, align_size(fb_size));
+      (int)fscrinfo->line_length, (int)(*fb_size), align_size(*fb_size));
 
 
-	*fbmmap = mmap(NULL, align_size(fb_size), PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+    *fbmmap = malloc(*fb_size);
+    if (*fbmmap == NULL)
+    {
+        perror("Framebuffer malloc fails");
+        close(fbfd);
+        return -1;
+    }
+#if 0
+	*fbmmap = mmap(NULL, align_size(fb_size), PROT_READ, 0, fbfd, 0);
 	if (*fbmmap == MAP_FAILED)
 	{
-		printf("mmap failed\n");
+        perror("mmap failed");
         close(fbfd);
 		return -1;
 	}
+#endif
 
     return fbfd;
 }
@@ -103,11 +113,17 @@ update_fb_info(int fbfd, struct fb_var_screeninfo *scrinfo)
 }
 
 unsigned int *
-readFrameBuffer(int fbfd, unsigned short int *fbmmap,
+readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
                 struct fb_var_screeninfo *scrinfo)
 {
   if (update_fb_info(fbfd, scrinfo) == -1)
     return NULL;
+  if (lseek(fbfd, SEEK_SET, 0) == -1)
+  {
+     perror("lseek failed for framebuffer device\n");
+  }
+  read(fbfd, fbmmap, fb_size);
+
   return (unsigned int *)fbmmap;
 }
 

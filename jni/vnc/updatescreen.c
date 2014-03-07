@@ -32,7 +32,7 @@ Lesser General Public License for more details.
 
 static int
 FUNCTION(rfbScreenInfoPtr vncscr,
-         int fbfd,
+         int fbfd, int fb_size,
          unsigned short int *fbbuf,
          unsigned short int *vncbuf,
          unsigned short int *fbmmap,
@@ -44,7 +44,7 @@ FUNCTION(rfbScreenInfoPtr vncscr,
     int unchanged = TRUE;
 
     OUT_T* a = (OUT_T*)fbbuf;
-    OUT_T* b = (OUT_T*)readFrameBuffer(fbfd, fbmmap, scrinfo);
+    OUT_T* b = (OUT_T*)readFrameBuffer(fbfd, fb_size, fbmmap, scrinfo);
 
     if (b == NULL)
         return -1;

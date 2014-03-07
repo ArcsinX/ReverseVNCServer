@@ -257,7 +257,7 @@ void print_usage(char **argv)
 int main(int argc, char **argv)
 {
     int (*update_screen)(rfbScreenInfoPtr,
-         int,
+         int, int,
          unsigned short int *,
          unsigned short int *,
          unsigned short int *,
@@ -277,6 +277,7 @@ int main(int argc, char **argv)
     unsigned short int      *fbmmap;
     unsigned short int      *fbbuf;
     unsigned short int      *vncbuf;
+    int                      fb_size;
 
     if (argc > 1)
     {
@@ -317,7 +318,7 @@ int main(int argc, char **argv)
         }
     }
 
-    fbfd = init_fb(&scrinfo, &fscrinfo, &fbmmap);
+    fbfd = init_fb(&scrinfo, &fscrinfo, &fbmmap, &fb_size);
     if (fbfd == -1)
     {
         puts("Failed to initialize frame buffer");
@@ -393,7 +394,7 @@ int main(int argc, char **argv)
                 rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
         rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
-        if (update_screen(vncscr, fbfd, fbbuf, vncbuf, fbmmap, &scrinfo) == -1)
+        if (update_screen(vncscr, fbfd, fb_size, fbbuf, vncbuf, fbmmap, &scrinfo) == -1)
         {
             puts("Failed to update screen");
             exit(EXIT_FAILURE);

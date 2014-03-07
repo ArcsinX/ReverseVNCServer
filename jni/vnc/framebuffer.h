@@ -16,9 +16,9 @@
 
 extern int           init_fb(struct fb_var_screeninfo *scrinfo,
                              struct fb_fix_screeninfo *fscrinfo,
-                             unsigned short **fbmmap);
+                             unsigned short **fbmmap, int *fb_size);
 extern void          cleanup_fb(int fbfd);
-extern unsigned int *readFrameBuffer(int fbfd, unsigned short int *fbmmap,
+extern unsigned int *readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
                                      struct fb_var_screeninfo *scrinfo);
 
 
