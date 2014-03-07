@@ -251,7 +251,8 @@ void print_usage(char **argv)
         "-v : view only\n"
         "-p localport : Local port for incoming connections (default is 5901)\n"
         "-s scale : scale percent (default is 100)\n"
-        "-h : print this help", argv[0]);
+        "-d framebuffer device (default is /dev/graphics/fb0)\n"
+        "-h : print this help\n", argv[0]);
 }
 
 int main(int argc, char **argv)
@@ -268,6 +269,7 @@ int main(int argc, char **argv)
     int  port = 5901;
     rfbClientPtr reverse_client = NULL;
     int  reconnect_on_lost = FALSE;
+    char *framebufferDevice = NULL;
 
     rfbScreenInfoPtr vncscr;
 
@@ -279,6 +281,7 @@ int main(int argc, char **argv)
     unsigned short int      *vncbuf;
     int                      fb_size;
 
+    puts("User options set:");
     if (argc > 1)
     {
         int i = 1;
@@ -295,22 +298,30 @@ int main(int argc, char **argv)
                     case 'c':
                         i++;
                         extract_host_port(argv[i], rhost, &rport);
+                        printf("\tReverse connection string: %s\n", argv[i]);
                         break;
                     case 'p':
                         i++;
                         port = atoi(argv[i]);
+                        printf("\tLocal port: %d\n", port);
                         break;
                     case 'r':
-                        i++;
                         reconnect_on_lost = TRUE;
+                        puts("\tReconnect on reverse connection lost");
                         break;
                     case 'v':
-                        i++;
                         viewOnly = TRUE;
+                        puts("\tView only mode enabled");
                         break;
                     case 's':
                         i++;
                         scalePercent = atoi(argv[i]);
+                        printf("\tscale: %d %%\n", scalePercent);
+                        break;
+                   case 'd':
+                        i++;
+                        framebufferDevice = argv[i];
+                        printf("\tframebuffer device: %s\n", framebufferDevice);
                         break;
                 }
             }
@@ -318,7 +329,7 @@ int main(int argc, char **argv)
         }
     }
 
-    fbfd = init_fb(&scrinfo, &fscrinfo, &fbmmap, &fb_size);
+    fbfd = init_fb(framebufferDevice, &scrinfo, &fscrinfo, &fbmmap, &fb_size);
     if (fbfd == -1)
     {
         puts("Failed to initialize frame buffer");
@@ -397,12 +408,15 @@ int main(int argc, char **argv)
         if (update_screen(vncscr, fbfd, fb_size, fbbuf, vncbuf, fbmmap, &scrinfo) == -1)
         {
             puts("Failed to update screen");
+            cleanup_fb(fbfd, fbmmap);
+            free(vncbuf);
+            free(fbbuf);
             exit(EXIT_FAILURE);
         }
     }
 
     printf("Cleaning up...\n");
-    cleanup_fb(fbfd);
+    cleanup_fb(fbfd, fbmmap);
     free(vncbuf);
     free(fbbuf);
 }

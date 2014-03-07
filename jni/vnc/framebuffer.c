@@ -14,20 +14,24 @@
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#if 0
 #include <sys/mman.h>
+#endif
 #include <errno.h>
 
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
 
+#if 0
 static inline int
 align_size(int size)
 {
     return (size + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
 }
+#endif
 
 int
-init_fb(struct fb_var_screeninfo *scrinfo,
+init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
         struct fb_fix_screeninfo *fscrinfo,
         unsigned short **fbmmap, int *fb_size)
 {
@@ -35,43 +39,48 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 	size_t bytespp;
     int fbfd;
 
-	printf("Initializing framebuffer device " FB_DEVICE "...\n");
+    if (framebuffer_device == NULL)
+        framebuffer_device = FB_DEVICE;
 
-	if ((fbfd = open(FB_DEVICE, O_RDONLY)) == -1)
-	{
-		printf("cannot open fb device %s\n", FB_DEVICE);
-		return -1;
-	}
+    printf("Initializing framebuffer device %s ... \n", framebuffer_device);
 
-	if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
-	{
-		printf("ioctl error\n");
-        close(fbfd);
-		return -1;
-	}
-
-    if (ioctl(fbfd, FBIOGET_FSCREENINFO, fscrinfo) != 0)
+    if ((fbfd = open(framebuffer_device, O_RDONLY)) == -1)
     {
-        printf("ioctl error\n");
+        printf("cannot open fb device %s\n", framebuffer_device);
+        perror("open failed");
+        return -1;
+    }
+
+    if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
+    {
+        perror("ioctl FBIOGET_VSCREENINFO failed");
         close(fbfd);
         return -1;
     }
 
-	pixels = scrinfo->xres * scrinfo->yres;
-	bytespp = scrinfo->bits_per_pixel / 8;
+    if (ioctl(fbfd, FBIOGET_FSCREENINFO, fscrinfo) != 0)
+    {
+        perror("ioctl FBIOGET_FSCREENINFO failed");
+        close(fbfd);
+        return -1;
+    }
+
+    pixels = scrinfo->xres * scrinfo->yres;
+    bytespp = scrinfo->bits_per_pixel / 8;
 
     size_t yres = scrinfo->yres * 2 > scrinfo->yres_virtual ?
                   scrinfo->yres * 2 :
                   scrinfo->yres_virtual;
     *fb_size = fscrinfo->line_length * yres;
 
-	printf("Screen info: xres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n"
-           "\tline_length=%d, fb_size=%d, align_size(fb_size)=%d\n",
-	  (int)scrinfo->xres, (int)scrinfo->yres,
-	  (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
-	  (int)scrinfo->xoffset, (int)scrinfo->yoffset,
-	  (int)scrinfo->bits_per_pixel,
-      (int)fscrinfo->line_length, (int)(*fb_size), align_size(*fb_size));
+    printf("Screen info:\n"
+           "\txres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n"
+           "\tline_length=%d, fb_size=%d\n",
+           (int)scrinfo->xres, (int)scrinfo->yres,
+           (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
+           (int)scrinfo->xoffset, (int)scrinfo->yoffset,
+           (int)scrinfo->bits_per_pixel,
+           (int)fscrinfo->line_length, (int)(*fb_size));
 
 
     *fbmmap = malloc(*fb_size);
@@ -95,10 +104,11 @@ init_fb(struct fb_var_screeninfo *scrinfo,
 }
 
 void
-cleanup_fb(int fbfd)
+cleanup_fb(int fbfd, void *fbmmap)
 {
 	if(fbfd != -1)
 		close(fbfd);
+    free(fbmmap);
 }
 
 static int
@@ -116,14 +126,19 @@ unsigned int *
 readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
                 struct fb_var_screeninfo *scrinfo)
 {
-  if (update_fb_info(fbfd, scrinfo) == -1)
-    return NULL;
-  if (lseek(fbfd, SEEK_SET, 0) == -1)
-  {
-     perror("lseek failed for framebuffer device\n");
-  }
-  read(fbfd, fbmmap, fb_size);
+    if (update_fb_info(fbfd, scrinfo) == -1)
+        return NULL;
+    if (lseek(fbfd, SEEK_SET, 0) == -1)
+    {
+        perror("lseek failed for framebuffer device\n");
+        return NULL;
+    }
+    if (read(fbfd, fbmmap, fb_size) == -1)
+    {
+        perror("Framebuffer read failed");
+        return NULL;
+    }
 
-  return (unsigned int *)fbmmap;
+    return (unsigned int *)fbmmap;
 }
 
