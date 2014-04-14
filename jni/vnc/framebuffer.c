@@ -22,7 +22,7 @@
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
 
-#if 0
+#if 1
 static inline int
 align_size(int size)
 {
@@ -83,6 +83,7 @@ init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
            (int)fscrinfo->line_length, (int)(*fb_size));
 
 
+#if 1
     *fbmmap = malloc(*fb_size);
     if (*fbmmap == NULL)
     {
@@ -90,8 +91,8 @@ init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
         close(fbfd);
         return -1;
     }
-#if 0
-	*fbmmap = mmap(NULL, align_size(fb_size), PROT_READ, 0, fbfd, 0);
+#else
+	*fbmmap = mmap(NULL, align_size(*fb_size), PROT_READ, 0, fbfd, 0);
 	if (*fbmmap == MAP_FAILED)
 	{
         perror("mmap failed");
@@ -128,6 +129,7 @@ readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
 {
     if (update_fb_info(fbfd, scrinfo) == -1)
         return NULL;
+#if 1
     if (lseek(fbfd, SEEK_SET, 0) == -1)
     {
         perror("lseek failed for framebuffer device\n");
@@ -138,6 +140,9 @@ readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
         perror("Framebuffer read failed");
         return NULL;
     }
+#else
+    (void)fb_size;
+#endif
 
     return (unsigned int *)fbmmap;
 }
