@@ -39,7 +39,9 @@
 
 static int viewOnly           = FALSE;
 static int scalePercent       = 100;
+#if 0
 static volatile int vncActive = FALSE;
+#endif
 
 static void
 injectKeyEvent(int code, int done)
@@ -75,7 +77,11 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
         case 0xFFC0:    scancode = AKEYCODE_SEARCH;          break; // F3
         case 0xFFC7:    scancode = AKEYCODE_POWER;           break; // F10
         case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
+#if 0
         case 0xFFC9:    vncActive = FALSE;                   break; // F12
+#else
+        case 0xFFC9:    exit(0);                             break; // F12
+#endif
     }
 
     return scancode;
@@ -87,7 +93,7 @@ keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
     int scancode;
 
-#if 1
+#if 0
     printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
@@ -105,7 +111,7 @@ injectTapEvent(int x, int y)
     sprintf(tap_cmd, "input tap %d %d", x, y);
     system(tap_cmd);
 
-#if 1
+#if 0
     printf("injectTapEvent (x=%d, y=%d)\n", x, y);
 #endif
 }
@@ -130,7 +136,9 @@ ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
     static int clicked = 0;
     static int prev_x, prev_y;
 
+#if 0
     printf("buttonMask = 0x%x, x=%d, y=%d, prev_x=%d, prev_y=%d, clicked=%d\n", buttonMask, x, y, prev_x, prev_y, clicked);
+#endif
     if ((buttonMask & 1) && clicked)
         return;
 
@@ -377,8 +385,12 @@ int main(int argc, char **argv)
         }
     }
 
+#if 0
     vncActive = TRUE;
     while (vncActive)
+#else
+    while(1)
+#endif
     {
         /* Reconnectio on reverse connection lost */
         if (reverse_client && reconnect_on_lost)
