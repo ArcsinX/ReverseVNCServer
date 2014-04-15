@@ -30,16 +30,15 @@ Lesser General Public License for more details.
 #define PIXEL_TO_VIRTUALPIXEL_FB(i,j) ((j+scrinfo.yoffset)*scrinfo.xres_virtual+i+scrinfo.xoffset)
 #endif
 
-static int
-FUNCTION()
+static int FUNCTION()
 {  
     int i, j;
-    int offset, pixelToVirtual;
+    int offset, pixel_to_virtual;
     int max_x = 0, max_y = 0, min_x = INT_MAX, min_y = INT_MAX;
     int unchanged = TRUE;
 
     OUT_T* a = (OUT_T*)fbbuf;
-    OUT_T* b = (OUT_T*)read_fb();
+    OUT_T* b = (OUT_T*)ReadFb();
 
     if (b == NULL)
         return -1;
@@ -50,11 +49,11 @@ FUNCTION()
         {
             offset = j * vncscr->width;
 
-            pixelToVirtual = PIXEL_TO_VIRTUALPIXEL_FB(i,j);
+            pixel_to_virtual = PIXEL_TO_VIRTUALPIXEL_FB(i,j);
 
-            if (a[i + offset] != b[pixelToVirtual])
+            if (a[i + offset] != b[pixel_to_virtual])
             {
-                a[i + offset] = b[pixelToVirtual];
+                a[i + offset] = b[pixel_to_virtual];
                 if (i > max_x)
                   max_x = i;
                 if (i < min_x)

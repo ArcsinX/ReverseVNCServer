@@ -41,22 +41,21 @@
 #define FALSE 0
 #endif
 
-static int viewOnly = FALSE;
+static int view_only = FALSE;
 
-static int screenScalePercent  = 100;
-static int cursorZoomPercent   = 100;
+static int screen_scale_percent  = 100;
+static int cursor_zoom_percent   = 100;
 
 rfbScreenInfoPtr    vncscr = NULL;
 unsigned short int *vncbuf = NULL;
 unsigned short int *fbbuf  = NULL;
 
 
-static volatile int vncActive = FALSE;
+static volatile int vnc_is_active = FALSE;
 
-static void cleanup();
+static void Cleanup();
 
-static void
-injectKeyEvent(int code, int done)
+static void InjectKeyEvent(int code, int done)
 {
     if (done)
     {
@@ -70,8 +69,7 @@ injectKeyEvent(int code, int done)
     }
 }
 
-static int
-keysym2scancode(rfbKeySym key, rfbClientPtr cl)
+static int KeySym2ScanCode(rfbKeySym key, rfbClientPtr cl)
 {
     int scancode = 0;
 
@@ -90,15 +88,14 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
         case 0xFFC0:    scancode = AKEYCODE_SEARCH;          break; // F3
         case 0xFFC7:    scancode = AKEYCODE_POWER;           break; // F10
         case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
-        case 0xFFC9:    vncActive = FALSE;                   break; // F12
+        case 0xFFC9:    vnc_is_active = FALSE;               break; // F12
     }
 
     return scancode;
 } 
 
 
-static void
-keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
+static void KeyEvent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
     int scancode;
 
@@ -106,15 +103,14 @@ keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
     printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
-    if ((scancode = keysym2scancode(key, cl)))
+    if ((scancode = KeySym2ScanCode(key, cl)))
     {
-        injectKeyEvent(scancode, down);
+        InjectKeyEvent(scancode, down);
     }
 
 }
 
-static void
-injectTapEvent(int x, int y)
+static void InjectTapEvent(int x, int y)
 {
     char tap_cmd[256];
     sprintf(tap_cmd, "input tap %d %d", x, y);
@@ -125,8 +121,7 @@ injectTapEvent(int x, int y)
 #endif
 }
 
-static void
-injectSwipeEvent(int x1, int y1, int x2, int y2)
+static void InjectSwipeEvent(int x1, int y1, int x2, int y2)
 {
     char swipe_cmd[256];
     sprintf(swipe_cmd, "input swipe %d %d %d %d", x1, y1, x2, y2);
@@ -139,25 +134,24 @@ injectSwipeEvent(int x1, int y1, int x2, int y2)
 }
 
 
-static void
-ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
+static void PtrEvent(int button_mask, int x, int y, rfbClientPtr cl)
 {
     static int clicked = 0;
     static int prev_x, prev_y;
 
-    if (cursorZoomPercent != 100)
+    if (cursor_zoom_percent != 100)
     {
-        x = (int)(((double)x * 100) / cursorZoomPercent);
-        y = (int)(((double)y * 100) / cursorZoomPercent);
+        x = (int)(((double)x * 100) / cursor_zoom_percent);
+        y = (int)(((double)y * 100) / cursor_zoom_percent);
     }
 
 #ifdef DEBUG
-    printf("buttonMask = 0x%x, x=%d, y=%d, prev_x=%d, prev_y=%d, clicked=%d\n", buttonMask, x, y, prev_x, prev_y, clicked);
+    printf("buttonMask = 0x%x, x=%d, y=%d, prev_x=%d, prev_y=%d, clicked=%d\n", button_mask, x, y, prev_x, prev_y, clicked);
 #endif
-    if ((buttonMask & 1) && clicked)
+    if ((button_mask & 1) && clicked)
         return;
 
-    if(buttonMask & 1)
+    if(button_mask & 1)
     {
         prev_x = x;
         prev_y = y;
@@ -166,16 +160,15 @@ ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
     else if (clicked)
     {
         if (x == prev_x && y == prev_y)
-            injectTapEvent(x, y);
+            InjectTapEvent(x, y);
         else
-            injectSwipeEvent(prev_x, prev_y, x, y);
+            InjectSwipeEvent(prev_x, prev_y, x, y);
         clicked = 0;
     }
 }
 
 
-void
-extract_host_port(char *str, char *rhost, int *rport)
+void ExtractHostPort(char *str, char *rhost, int *rport)
 {
     int len = strlen(str);
     char *p;
@@ -199,24 +192,22 @@ extract_host_port(char *str, char *rhost, int *rport)
     } 
 }
 
-static enum rfbNewClientAction
-newVncClient(rfbClientPtr cl)
+static enum rfbNewClientAction NewVncClient(rfbClientPtr cl)
 {
 
-    if (screenScalePercent != 100)
+    if (screen_scale_percent != 100)
     {
         rfbScalingSetup(cl,
-                        cl->screen->width  * screenScalePercent / 100,
-                        cl->screen->height * screenScalePercent / 100);
+                        cl->screen->width  * screen_scale_percent / 100,
+                        cl->screen->height * screen_scale_percent / 100);
     }
-    cl->viewOnly = viewOnly;
+    cl->viewOnly = view_only;
 
     return RFB_CLIENT_ACCEPT;
 }
 
-void
-init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
-                 unsigned short int *vncbuf)
+static void InitVncServer(int port, struct fb_var_screeninfo *scrinfo,
+                          unsigned short int *vncbuf)
 {
     printf("Initializing server...\n");
 
@@ -230,8 +221,8 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     vncscr->httpDir = "webclients/";
     vncscr->port = port;
 
-    vncscr->kbdAddEvent = keyevent;
-    vncscr->ptrAddEvent = ptrevent;
+    vncscr->kbdAddEvent = KeyEvent;
+    vncscr->ptrAddEvent = PtrEvent;
 
     vncscr->serverFormat.redShift = scrinfo->red.offset;
     vncscr->serverFormat.greenShift = scrinfo->green.offset;
@@ -248,7 +239,7 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
     vncscr->deferPtrUpdateTime = 9999999;
     vncscr->handleEventsEagerly = TRUE;
 
-    vncscr->newClientHook = newVncClient;
+    vncscr->newClientHook = NewVncClient;
 
     rfbInitServer(vncscr);
 
@@ -266,7 +257,7 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
 #include "updatescreen.c"
 #undef OUT
 
-static void print_usage(char **argv)
+static void PrintUsage(char **argv)
 {
     printf("%s [-h] [-c host:port] [-r] [-v] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
@@ -279,7 +270,7 @@ static void print_usage(char **argv)
         "-h : print this help\n", argv[0]);
 }
 
-static void cleanup()
+static void Cleanup()
 {
     printf("Cleaning up...\n");
 
@@ -288,17 +279,19 @@ static void cleanup()
         rfbScreenCleanup(vncscr);
         vncscr = NULL;
     }
-    cleanup_fb();
+    CleanupFb();
     free(vncbuf);
     vncbuf = NULL;
     free(fbbuf);
     fbbuf = NULL;
 }
 
-static void termination_handler(int signo)
+static void TerminationHandler(int signo)
 {
+    /* Prevent warning */
     (void)signo;
-    cleanup();
+    /* Perform cleanup */
+    Cleanup();
 }
 
 
@@ -310,10 +303,10 @@ int main(int argc, char **argv)
     int  rport      = 5500;
     int  port       = 5901;
 
-    rfbClientPtr reverseClient  = NULL;
-    int          reconnectOnLost = FALSE;
+    rfbClientPtr reverse_client    = NULL;
+    int          reconnect_on_lost = FALSE;
 
-    char        *framebufferDevice = NULL;
+    char        *fbdevice = NULL;
 
     puts("User options set:");
     if (argc > 1)
@@ -326,12 +319,12 @@ int main(int argc, char **argv)
                 switch(*(argv[i] + 1))
                 {
                     case 'h':
-                        print_usage(argv);
+                        PrintUsage(argv);
                         exit(0);
                         break;
                     case 'c':
                         i++;
-                        extract_host_port(argv[i], rhost, &rport);
+                        ExtractHostPort(argv[i], rhost, &rport);
                         printf("\tReverse connection string: %s\n", argv[i]);
                         break;
                     case 'p':
@@ -340,28 +333,28 @@ int main(int argc, char **argv)
                         printf("\tLocal port: %d\n", port);
                         break;
                     case 'r':
-                        reconnectOnLost = TRUE;
+                        reconnect_on_lost = TRUE;
                         puts("\tReconnect on reverse connection lost");
                         break;
                     case 'v':
-                        viewOnly = TRUE;
+                        view_only = TRUE;
                         puts("\tView only mode enabled");
                         break;
                     case 's':
                         i++;
-                        screenScalePercent = atoi(argv[i]);
-                        printf("\tscreen scale: %d %%\n", screenScalePercent);
+                        screen_scale_percent = atoi(argv[i]);
+                        printf("\tscreen scale: %d %%\n", screen_scale_percent);
                         break;
                     case 'd':
                         i++;
-                        framebufferDevice = argv[i];
-                        printf("\tframebuffer device: %s\n", framebufferDevice);
+                        fbdevice = argv[i];
+                        printf("\tframebuffer device: %s\n", fbdevice);
                         break;
                     case 'z':
                         i++;
-                        cursorZoomPercent = atoi(argv[i]);
+                        cursor_zoom_percent = atoi(argv[i]);
                         printf("\tcursor coordinates zoom percent: %d\n",
-                               cursorZoomPercent);
+                               cursor_zoom_percent);
                         break;
                 }
             }
@@ -369,11 +362,11 @@ int main(int argc, char **argv)
         }
     }
 
-    (void)signal(SIGINT,  termination_handler);
-    (void)signal(SIGHUP,  termination_handler);
-    (void)signal(SIGTERM, termination_handler);
+    (void)signal(SIGINT,  TerminationHandler);
+    (void)signal(SIGHUP,  TerminationHandler);
+    (void)signal(SIGTERM, TerminationHandler);
 
-    fbfd = init_fb(framebufferDevice);
+    fbfd = InitFb(fbdevice);
     if (fbfd == -1)
     {
         puts("Failed to initialize frame buffer");
@@ -385,14 +378,14 @@ int main(int argc, char **argv)
     fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
     assert(fbbuf != NULL);
 
-    init_vnc_server(port, &scrinfo, vncbuf);
+    InitVncServer(port, &scrinfo, vncbuf);
 
     printf("Initializing VNC server:\n");
     printf("	width:         %d\n", (int)scrinfo.xres);
     printf("	height:        %d\n", (int)scrinfo.yres);
     printf("	bpp:           %d\n", (int)scrinfo.bits_per_pixel);
     printf("	port:          %d\n", port);
-    printf("	screen scale:  %d\n", screenScalePercent);
+    printf("	screen scale:  %d\n", screen_scale_percent);
 
     if (vncscr->serverFormat.bitsPerPixel == 32)
         update_screen = update_screen_32;
@@ -405,28 +398,28 @@ int main(int argc, char **argv)
 
     if (rhost[0] != '\0')
     {
-        reverseClient = rfbReverseConnection(vncscr, rhost, rport);
-        if (reverseClient == NULL)
+        reverse_client = rfbReverseConnection(vncscr, rhost, rport);
+        if (reverse_client == NULL)
             printf("Couldn't connect to remote host: %s at port %d\n",
                    rhost, rport);
         else
         {
-            reverseClient->onHold = FALSE;
-            rfbStartOnHoldClient(reverseClient);
-            (void)newVncClient(reverseClient);
+            reverse_client->onHold = FALSE;
+            rfbStartOnHoldClient(reverse_client);
+            (void)NewVncClient(reverse_client);
         }
     }
 
-    vncActive = TRUE;
-    while (vncActive)
+    vnc_is_active = TRUE;
+    while (vnc_is_active)
     {
         /* Reconnectio on reverse connection lost */
-        if (reverseClient && reconnectOnLost)
+        if (reverse_client && reconnect_on_lost)
         {
             rfbClientPtr cl;
 
             for (cl = vncscr->clientHead;
-                 cl != NULL && cl != reverseClient;
+                 cl != NULL && cl != reverse_client;
                  cl = cl->next);
 
             if (cl == NULL || cl->sock == -1)
@@ -437,15 +430,15 @@ int main(int argc, char **argv)
                            rhost, rport);
                 else
                 {
-                    reverseClient = cl;
-                    reverseClient->onHold = FALSE;
-                    rfbStartOnHoldClient(reverseClient);
-                    (void)newVncClient(reverseClient);
+                    reverse_client = cl;
+                    reverse_client->onHold = FALSE;
+                    rfbStartOnHoldClient(reverse_client);
+                    (void)NewVncClient(reverse_client);
                 }
             }
         }
 
-        if (!reverseClient)
+        if (!reverse_client)
             while (vncscr->clientHead == NULL)
                 rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
@@ -453,11 +446,11 @@ int main(int argc, char **argv)
         if (update_screen() == -1)
         {
             puts("Failed to update screen");
-            cleanup();
+            Cleanup();
             exit(EXIT_FAILURE);
         }
     }
 
     rfbShutdownServer(vncscr, TRUE);
-    cleanup();
+    Cleanup();
 }

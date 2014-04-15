@@ -36,27 +36,25 @@ struct fb_var_screeninfo  scrinfo  = {0};
 struct fb_fix_screeninfo  fscrinfo = {0};
 
 #ifdef USE_MMAP
-static inline int
-align_size(int size)
+static inline int AlignSize(int size)
 {
     return (size + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1);
 }
 #endif
 
-int
-init_fb(char *framebuffer_device)
+int InitFb(char *fbdevice)
 {
 	size_t pixels;
 	size_t bytespp;
 
-    if (framebuffer_device == NULL)
-        framebuffer_device = FB_DEVICE;
+    if (fbdevice == NULL)
+        fbdevice = FB_DEVICE;
 
-    printf("Initializing framebuffer device %s ... \n", framebuffer_device);
+    printf("Initializing framebuffer device %s ... \n", fbdevice);
 
-    if ((fbfd = open(framebuffer_device, O_RDONLY)) == -1)
+    if ((fbfd = open(fbdevice, O_RDONLY)) == -1)
     {
-        printf("cannot open fb device %s\n", framebuffer_device);
+        printf("cannot open fb device %s\n", fbdevice);
         perror("open failed");
         return -1;
     }
@@ -105,7 +103,7 @@ init_fb(char *framebuffer_device)
         return -1;
     }
 #else
-	fbmmap = mmap(NULL, align_size(fbsize), PROT_READ, 0, fbfd, 0);
+	fbmmap = mmap(NULL, AlignSize(fbsize), PROT_READ, 0, fbfd, 0);
 	if (fbmmap == MAP_FAILED)
 	{
         perror("mmap failed");
@@ -118,8 +116,7 @@ init_fb(char *framebuffer_device)
     return fbfd;
 }
 
-void
-cleanup_fb()
+void CleanupFb()
 {
     int fd;
 
@@ -148,8 +145,7 @@ cleanup_fb()
     close(fd);
 }
 
-static int
-update_fb_info()
+static int UpdateFbInfo()
 {
     if (ioctl(fbfd, FBIOGET_VSCREENINFO, &scrinfo) != 0)
     {
@@ -159,10 +155,9 @@ update_fb_info()
     return 0;
 }
 
-unsigned int *
-read_fb()
+unsigned int *ReadFb()
 {
-    if (update_fb_info() == -1)
+    if (UpdateFbInfo() == -1)
         return NULL;
 #ifndef USEMMAP
     if (lseek(fbfd, SEEK_SET, 0) == -1)

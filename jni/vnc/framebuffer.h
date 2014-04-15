@@ -14,9 +14,9 @@
 
 #include <linux/fb.h>
 
-extern int                init_fb(char *framebuffer_device);
-extern void               cleanup_fb();
-extern unsigned int      *read_fb();
+extern int                InitFb(char *);
+extern void               CleanupFb();
+extern unsigned int      *ReadFb();
 
 extern int                fbfd;
 extern unsigned short    *fbmmap;
