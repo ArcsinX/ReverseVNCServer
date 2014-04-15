@@ -27,16 +27,11 @@ Lesser General Public License for more details.
 #define FUNCTION CONCAT2E(update_screen_,OUT)
 
 #ifndef PIXEL_TO_VIRTUALPIXEL_FB
-#define PIXEL_TO_VIRTUALPIXEL_FB(i,j) ((j+scrinfo->yoffset)*scrinfo->xres_virtual+i+scrinfo->xoffset)
+#define PIXEL_TO_VIRTUALPIXEL_FB(i,j) ((j+scrinfo.yoffset)*scrinfo.xres_virtual+i+scrinfo.xoffset)
 #endif
 
 static int
-FUNCTION(rfbScreenInfoPtr vncscr,
-         int fbfd, int fb_size,
-         unsigned short int *fbbuf,
-         unsigned short int *vncbuf,
-         unsigned short int *fbmmap,
-         struct fb_var_screeninfo *scrinfo)
+FUNCTION()
 {  
     int i, j;
     int offset, pixelToVirtual;
@@ -44,7 +39,7 @@ FUNCTION(rfbScreenInfoPtr vncscr,
     int unchanged = TRUE;
 
     OUT_T* a = (OUT_T*)fbbuf;
-    OUT_T* b = (OUT_T*)readFrameBuffer(fbfd, fb_size, fbmmap, scrinfo);
+    OUT_T* b = (OUT_T*)read_fb();
 
     if (b == NULL)
         return -1;
@@ -78,8 +73,8 @@ FUNCTION(rfbScreenInfoPtr vncscr,
     if (!unchanged)
     {
         memcpy(vncbuf, a,
-               scrinfo->xres * scrinfo->yres *
-               scrinfo->bits_per_pixel / 8);
+               scrinfo.xres * scrinfo.yres *
+               scrinfo.bits_per_pixel / 8);
 
         rfbMarkRectAsModified(vncscr, min_x, min_y, max_x, max_y);
     }

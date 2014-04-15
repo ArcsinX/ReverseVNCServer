@@ -10,6 +10,10 @@
  * General Public License for more details.
  */
 
+#if 0
+#define DEBUG
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,11 +41,17 @@
 #define FALSE 0
 #endif
 
-static int viewOnly           = FALSE;
-static int scalePercent       = 100;
-#if 0
+static int viewOnly            = FALSE;
+static int scalePercent        = 100;
+
+rfbScreenInfoPtr    vncscr = NULL;
+unsigned short int *vncbuf = NULL;
+unsigned short int *fbbuf  = NULL;
+
+
 static volatile int vncActive = FALSE;
-#endif
+
+static void cleanup();
 
 static void
 injectKeyEvent(int code, int done)
@@ -52,7 +62,7 @@ injectKeyEvent(int code, int done)
         sprintf(keyevent_cmd, "input keyevent %d", code);
         system(keyevent_cmd);
 
-#if 0
+#ifdef DEBUG
         printf("injectKeyEvent code=%d\n", code);
 #endif
     }
@@ -66,6 +76,7 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
     int code = (int)key;
     switch (code)
     {
+        case 0xFF0D:    scancode = AKEYCODE_ENTER;           break; // Enter
         case 0xFF51:    scancode = AKEYCODE_DPAD_LEFT;       break; // left 
         case 0xFF53:    scancode = AKEYCODE_DPAD_RIGHT;      break; // right
         case 0xFF54:    scancode = AKEYCODE_DPAD_DOWN;       break; // down
@@ -77,11 +88,7 @@ keysym2scancode(rfbKeySym key, rfbClientPtr cl)
         case 0xFFC0:    scancode = AKEYCODE_SEARCH;          break; // F3
         case 0xFFC7:    scancode = AKEYCODE_POWER;           break; // F10
         case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
-#if 0
         case 0xFFC9:    vncActive = FALSE;                   break; // F12
-#else
-        case 0xFFC9:    exit(0);                             break; // F12
-#endif
     }
 
     return scancode;
@@ -93,7 +100,7 @@ keyevent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
 {
     int scancode;
 
-#if 0
+#ifdef DEBUG
     printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
@@ -111,7 +118,7 @@ injectTapEvent(int x, int y)
     sprintf(tap_cmd, "input tap %d %d", x, y);
     system(tap_cmd);
 
-#if 0
+#ifdef DEBUG
     printf("injectTapEvent (x=%d, y=%d)\n", x, y);
 #endif
 }
@@ -123,7 +130,7 @@ injectSwipeEvent(int x1, int y1, int x2, int y2)
     sprintf(swipe_cmd, "input swipe %d %d %d %d", x1, y1, x2, y2);
     system(swipe_cmd);
 
-#if 0
+#ifdef DEBUG
     printf("injectSwipeEvent (x1=%d, y1=%d, x2=%d, y2=%d)\n",
            x1, y1, x2, y2);
 #endif
@@ -136,7 +143,7 @@ ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
     static int clicked = 0;
     static int prev_x, prev_y;
 
-#if 0
+#ifdef DEBUG
     printf("buttonMask = 0x%x, x=%d, y=%d, prev_x=%d, prev_y=%d, clicked=%d\n", buttonMask, x, y, prev_x, prev_y, clicked);
 #endif
     if ((buttonMask & 1) && clicked)
@@ -199,12 +206,10 @@ newVncClient(rfbClientPtr cl)
     return RFB_CLIENT_ACCEPT;
 }
 
-static rfbScreenInfoPtr
+void
 init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
                  unsigned short int *vncbuf)
 {
-    rfbScreenInfoPtr vncscr;
-
     printf("Initializing server...\n");
 
     vncscr = rfbGetScreen(NULL, NULL, scrinfo->xres, scrinfo->yres, 5, 2,
@@ -241,8 +246,6 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
 
     /* Mark as dirty since we haven't sent any updates at all yet. */
     rfbMarkRectAsModified(vncscr, 0, 0, scrinfo->xres, scrinfo->yres);
-
-    return vncscr;
 }
 
 #define OUT 32
@@ -255,7 +258,7 @@ init_vnc_server(int port, struct fb_var_screeninfo *scrinfo,
 #include "updatescreen.c"
 #undef OUT
 
-void print_usage(char **argv)
+static void print_usage(char **argv)
 {
     printf("%s [-h] [-c host:port] [-r] [-v] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
@@ -267,14 +270,32 @@ void print_usage(char **argv)
         "-h : print this help\n", argv[0]);
 }
 
+static void cleanup()
+{
+    printf("Cleaning up...\n");
+
+    if (vncscr)
+    {
+        rfbScreenCleanup(vncscr);
+        vncscr = NULL;
+    }
+    cleanup_fb();
+    free(vncbuf);
+    vncbuf = NULL;
+    free(fbbuf);
+    fbbuf = NULL;
+}
+
+static void termination_handler(int signo)
+{
+    (void)signo;
+    cleanup();
+}
+
+
 int main(int argc, char **argv)
 {
-    int (*update_screen)(rfbScreenInfoPtr,
-         int, int,
-         unsigned short int *,
-         unsigned short int *,
-         unsigned short int *,
-         struct fb_var_screeninfo *) = NULL;
+    int (*update_screen)() = NULL;
 
     char rhost[256] = {0};
     int  rport = 5500;
@@ -282,16 +303,6 @@ int main(int argc, char **argv)
     rfbClientPtr reverse_client = NULL;
     int  reconnect_on_lost = FALSE;
     char *framebufferDevice = NULL;
-
-    rfbScreenInfoPtr vncscr;
-
-    struct fb_var_screeninfo scrinfo;
-    struct fb_fix_screeninfo fscrinfo;
-    int                      fbfd;
-    unsigned short int      *fbmmap;
-    unsigned short int      *fbbuf;
-    unsigned short int      *vncbuf;
-    int                      fb_size;
 
     puts("User options set:");
     if (argc > 1)
@@ -341,7 +352,11 @@ int main(int argc, char **argv)
         }
     }
 
-    fbfd = init_fb(framebufferDevice, &scrinfo, &fscrinfo, &fbmmap, &fb_size);
+    (void)signal(SIGINT,  termination_handler);
+    (void)signal(SIGHUP,  termination_handler);
+    (void)signal(SIGTERM, termination_handler);
+
+    fbfd = init_fb(framebufferDevice);
     if (fbfd == -1)
     {
         puts("Failed to initialize frame buffer");
@@ -353,7 +368,7 @@ int main(int argc, char **argv)
     fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
     assert(fbbuf != NULL);
 
-    vncscr = init_vnc_server(port, &scrinfo, vncbuf);
+    init_vnc_server(port, &scrinfo, vncbuf);
 
     printf("Initializing VNC server:\n");
     printf("	width:  %d\n", (int)scrinfo.xres);
@@ -385,12 +400,8 @@ int main(int argc, char **argv)
         }
     }
 
-#if 0
     vncActive = TRUE;
     while (vncActive)
-#else
-    while(1)
-#endif
     {
         /* Reconnectio on reverse connection lost */
         if (reverse_client && reconnect_on_lost)
@@ -422,20 +433,14 @@ int main(int argc, char **argv)
                 rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
         rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
-        if (update_screen(vncscr, fbfd, fb_size, fbbuf, vncbuf, fbmmap, &scrinfo) == -1)
+        if (update_screen() == -1)
         {
             puts("Failed to update screen");
-            rfbScreenCleanup(vncscr);
-            cleanup_fb(fbfd, fbmmap);
-            free(vncbuf);
-            free(fbbuf);
+            cleanup();
             exit(EXIT_FAILURE);
         }
     }
 
-    printf("Cleaning up...\n");
-    rfbScreenCleanup(vncscr);
-    cleanup_fb(fbfd, fbmmap);
-    free(vncbuf);
-    free(fbbuf);
+    rfbShutdownServer(vncscr, TRUE);
+    cleanup();
 }

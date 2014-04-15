@@ -10,19 +10,32 @@
  * General Public License for more details.
  */
 
+#if 0
+#define USE_MMAP
+#endif
+
 #include <stdio.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#if 0
+#ifdef USE_MMAP
 #include <sys/mman.h>
 #endif
 #include <errno.h>
 
 /* Android does not use /dev/fb0. */
 #define FB_DEVICE "/dev/graphics/fb0"
+int                       fbfd     = -1;
+#ifdef USE_MMAP
+unsigned short           *fbmmap   = MAP_FAILED;
+#else
+unsigned short           *fbmmap   = NULL;
+#endif
+int                       fbsize   = 0;
+struct fb_var_screeninfo  scrinfo  = {0};
+struct fb_fix_screeninfo  fscrinfo = {0};
 
-#if 1
+#ifdef USE_MMAP
 static inline int
 align_size(int size)
 {
@@ -31,13 +44,10 @@ align_size(int size)
 #endif
 
 int
-init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
-        struct fb_fix_screeninfo *fscrinfo,
-        unsigned short **fbmmap, int *fb_size)
+init_fb(char *framebuffer_device)
 {
 	size_t pixels;
 	size_t bytespp;
-    int fbfd;
 
     if (framebuffer_device == NULL)
         framebuffer_device = FB_DEVICE;
@@ -51,52 +61,56 @@ init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
         return -1;
     }
 
-    if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
+    if (ioctl(fbfd, FBIOGET_VSCREENINFO, &scrinfo) != 0)
     {
         perror("ioctl FBIOGET_VSCREENINFO failed");
         close(fbfd);
+        fbfd = -1;
         return -1;
     }
 
-    if (ioctl(fbfd, FBIOGET_FSCREENINFO, fscrinfo) != 0)
+    if (ioctl(fbfd, FBIOGET_FSCREENINFO, &fscrinfo) != 0)
     {
         perror("ioctl FBIOGET_FSCREENINFO failed");
         close(fbfd);
+        fbfd = -1;
         return -1;
     }
 
-    pixels = scrinfo->xres * scrinfo->yres;
-    bytespp = scrinfo->bits_per_pixel / 8;
+    pixels = scrinfo.xres * scrinfo.yres;
+    bytespp = scrinfo.bits_per_pixel / 8;
 
-    size_t yres = scrinfo->yres * 2 > scrinfo->yres_virtual ?
-                  scrinfo->yres * 2 :
-                  scrinfo->yres_virtual;
-    *fb_size = fscrinfo->line_length * yres;
+    size_t yres = scrinfo.yres * 2 > scrinfo.yres_virtual ?
+                  scrinfo.yres * 2 :
+                  scrinfo.yres_virtual;
+    fbsize = fscrinfo.line_length * yres;
 
     printf("Screen info:\n"
            "\txres=%d, yres=%d, xresv=%d, yresv=%d, xoffs=%d, yoffs=%d, bpp=%d\n"
-           "\tline_length=%d, fb_size=%d\n",
-           (int)scrinfo->xres, (int)scrinfo->yres,
-           (int)scrinfo->xres_virtual, (int)scrinfo->yres_virtual,
-           (int)scrinfo->xoffset, (int)scrinfo->yoffset,
-           (int)scrinfo->bits_per_pixel,
-           (int)fscrinfo->line_length, (int)(*fb_size));
+           "\tline_length=%d, fbsize=%d\n",
+           (int)scrinfo.xres, (int)scrinfo.yres,
+           (int)scrinfo.xres_virtual, (int)scrinfo.yres_virtual,
+           (int)scrinfo.xoffset, (int)scrinfo.yoffset,
+           (int)scrinfo.bits_per_pixel,
+           (int)fscrinfo.line_length, (int)fbsize);
 
 
-#if 1
-    *fbmmap = malloc(*fb_size);
-    if (*fbmmap == NULL)
+#ifndef USE_MMAP
+    fbmmap = malloc(fbsize);
+    if (fbmmap == NULL)
     {
         perror("Framebuffer malloc fails");
         close(fbfd);
+        fbfd = -1;
         return -1;
     }
 #else
-	*fbmmap = mmap(NULL, align_size(*fb_size), PROT_READ, 0, fbfd, 0);
-	if (*fbmmap == MAP_FAILED)
+	fbmmap = mmap(NULL, align_size(fbsize), PROT_READ, 0, fbfd, 0);
+	if (fbmmap == MAP_FAILED)
 	{
         perror("mmap failed");
         close(fbfd);
+        fbfd = -1;
 		return -1;
 	}
 #endif
@@ -105,43 +119,62 @@ init_fb(char *framebuffer_device, struct fb_var_screeninfo *scrinfo,
 }
 
 void
-cleanup_fb(int fbfd, void *fbmmap)
+cleanup_fb()
 {
-	if(fbfd != -1)
+    int fd;
+
+	if (fbfd != -1)
+    {
 		close(fbfd);
+        fbfd = -1;
+    }
+#ifdef USE_MMAP
+    munmap(fbmmap, fbsize);
+    fbmmap = MAP_FAILED;
+#else
     free(fbmmap);
+    fbmmap = NULL;
+#endif
+    /* HACK:
+     * Old rk3188 video driver has the following problem:
+     * closing file descriptor leads to screen turning off.
+     * So we should enable it back by writing 1 into
+     * /sys/class/graphics/fb0/enable
+     */
+    fd = open("/sys/class/graphics/fb0/enable", O_RDWR);
+    if (fd == -1)
+        return;
+    write(fd, "1", 1);
+    close(fd);
 }
 
 static int
-update_fb_info(int fbfd, struct fb_var_screeninfo *scrinfo)
+update_fb_info()
 {
-    if (ioctl(fbfd, FBIOGET_VSCREENINFO, scrinfo) != 0)
+    if (ioctl(fbfd, FBIOGET_VSCREENINFO, &scrinfo) != 0)
     {
-        printf("ioctl error\n");
+        perror("update_fb_info: ioctl error\n");
         return -1;
     }
     return 0;
 }
 
 unsigned int *
-readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
-                struct fb_var_screeninfo *scrinfo)
+read_fb()
 {
-    if (update_fb_info(fbfd, scrinfo) == -1)
+    if (update_fb_info() == -1)
         return NULL;
-#if 1
+#ifndef USEMMAP
     if (lseek(fbfd, SEEK_SET, 0) == -1)
     {
         perror("lseek failed for framebuffer device\n");
         return NULL;
     }
-    if (read(fbfd, fbmmap, fb_size) == -1)
+    if (read(fbfd, fbmmap, fbsize) == -1)
     {
         perror("Framebuffer read failed");
         return NULL;
     }
-#else
-    (void)fb_size;
 #endif
 
     return (unsigned int *)fbmmap;

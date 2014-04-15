@@ -14,14 +14,15 @@
 
 #include <linux/fb.h>
 
-extern int           init_fb(char *framebuffer_device,
-                             struct fb_var_screeninfo *scrinfo,
-                             struct fb_fix_screeninfo *fscrinfo,
-                             unsigned short **fbmmap, int *fb_size);
-extern void          cleanup_fb(int fbfd, void *fbmmap);
-extern unsigned int *readFrameBuffer(int fbfd, int fb_size, unsigned short int *fbmmap,
-                                     struct fb_var_screeninfo *scrinfo);
+extern int                init_fb(char *framebuffer_device);
+extern void               cleanup_fb();
+extern unsigned int      *read_fb();
 
+extern int                fbfd;
+extern unsigned short    *fbmmap;
+int                       fbsize;
+struct fb_var_screeninfo  scrinfo;
+struct fb_fix_screeninfo  fscrinfo;
 
 
 #endif /* _VNC_FRAME_BUFFER_H_ */
