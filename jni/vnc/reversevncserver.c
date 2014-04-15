@@ -41,8 +41,10 @@
 #define FALSE 0
 #endif
 
-static int viewOnly            = FALSE;
-static int scalePercent        = 100;
+static int viewOnly = FALSE;
+
+static int screenScalePercent  = 100;
+static int cursorZoomPercent   = 100;
 
 rfbScreenInfoPtr    vncscr = NULL;
 unsigned short int *vncbuf = NULL;
@@ -143,6 +145,12 @@ ptrevent(int buttonMask, int x, int y, rfbClientPtr cl)
     static int clicked = 0;
     static int prev_x, prev_y;
 
+    if (cursorZoomPercent != 100)
+    {
+        x = (int)(((double)x * 100) / cursorZoomPercent);
+        y = (int)(((double)y * 100) / cursorZoomPercent);
+    }
+
 #ifdef DEBUG
     printf("buttonMask = 0x%x, x=%d, y=%d, prev_x=%d, prev_y=%d, clicked=%d\n", buttonMask, x, y, prev_x, prev_y, clicked);
 #endif
@@ -195,11 +203,11 @@ static enum rfbNewClientAction
 newVncClient(rfbClientPtr cl)
 {
 
-    if (scalePercent != 100)
+    if (screenScalePercent != 100)
     {
         rfbScalingSetup(cl,
-                        cl->screen->width  * scalePercent / 100,
-                        cl->screen->height * scalePercent / 100);
+                        cl->screen->width  * screenScalePercent / 100,
+                        cl->screen->height * screenScalePercent / 100);
     }
     cl->viewOnly = viewOnly;
 
@@ -267,6 +275,7 @@ static void print_usage(char **argv)
         "-p localport : Local port for incoming connections (default is 5901)\n"
         "-s scale : scale percent (default is 100)\n"
         "-d framebuffer device (default is /dev/graphics/fb0)\n"
+        "-z zoom : specify zoom of cursor coordinates in precents\n"
         "-h : print this help\n", argv[0]);
 }
 
@@ -298,11 +307,13 @@ int main(int argc, char **argv)
     int (*update_screen)() = NULL;
 
     char rhost[256] = {0};
-    int  rport = 5500;
-    int  port = 5901;
-    rfbClientPtr reverse_client = NULL;
-    int  reconnect_on_lost = FALSE;
-    char *framebufferDevice = NULL;
+    int  rport      = 5500;
+    int  port       = 5901;
+
+    rfbClientPtr reverseClient  = NULL;
+    int          reconnectOnLost = FALSE;
+
+    char        *framebufferDevice = NULL;
 
     puts("User options set:");
     if (argc > 1)
@@ -329,7 +340,7 @@ int main(int argc, char **argv)
                         printf("\tLocal port: %d\n", port);
                         break;
                     case 'r':
-                        reconnect_on_lost = TRUE;
+                        reconnectOnLost = TRUE;
                         puts("\tReconnect on reverse connection lost");
                         break;
                     case 'v':
@@ -338,13 +349,19 @@ int main(int argc, char **argv)
                         break;
                     case 's':
                         i++;
-                        scalePercent = atoi(argv[i]);
-                        printf("\tscale: %d %%\n", scalePercent);
+                        screenScalePercent = atoi(argv[i]);
+                        printf("\tscreen scale: %d %%\n", screenScalePercent);
                         break;
-                   case 'd':
+                    case 'd':
                         i++;
                         framebufferDevice = argv[i];
                         printf("\tframebuffer device: %s\n", framebufferDevice);
+                        break;
+                    case 'z':
+                        i++;
+                        cursorZoomPercent = atoi(argv[i]);
+                        printf("\tcursor coordinates zoom percent: %d\n",
+                               cursorZoomPercent);
                         break;
                 }
             }
@@ -371,11 +388,11 @@ int main(int argc, char **argv)
     init_vnc_server(port, &scrinfo, vncbuf);
 
     printf("Initializing VNC server:\n");
-    printf("	width:  %d\n", (int)scrinfo.xres);
-    printf("	height: %d\n", (int)scrinfo.yres);
-    printf("	bpp:    %d\n", (int)scrinfo.bits_per_pixel);
-    printf("	port:   %d\n", port);
-    printf("	scale:  %d\n", scalePercent);
+    printf("	width:         %d\n", (int)scrinfo.xres);
+    printf("	height:        %d\n", (int)scrinfo.yres);
+    printf("	bpp:           %d\n", (int)scrinfo.bits_per_pixel);
+    printf("	port:          %d\n", port);
+    printf("	screen scale:  %d\n", screenScalePercent);
 
     if (vncscr->serverFormat.bitsPerPixel == 32)
         update_screen = update_screen_32;
@@ -388,15 +405,15 @@ int main(int argc, char **argv)
 
     if (rhost[0] != '\0')
     {
-        reverse_client = rfbReverseConnection(vncscr, rhost, rport);
-        if (reverse_client == NULL)
+        reverseClient = rfbReverseConnection(vncscr, rhost, rport);
+        if (reverseClient == NULL)
             printf("Couldn't connect to remote host: %s at port %d\n",
                    rhost, rport);
         else
         {
-            reverse_client->onHold = FALSE;
-            rfbStartOnHoldClient(reverse_client);
-            (void)newVncClient(reverse_client);
+            reverseClient->onHold = FALSE;
+            rfbStartOnHoldClient(reverseClient);
+            (void)newVncClient(reverseClient);
         }
     }
 
@@ -404,12 +421,12 @@ int main(int argc, char **argv)
     while (vncActive)
     {
         /* Reconnectio on reverse connection lost */
-        if (reverse_client && reconnect_on_lost)
+        if (reverseClient && reconnectOnLost)
         {
             rfbClientPtr cl;
 
             for (cl = vncscr->clientHead;
-                 cl != NULL && cl != reverse_client;
+                 cl != NULL && cl != reverseClient;
                  cl = cl->next);
 
             if (cl == NULL || cl->sock == -1)
@@ -420,15 +437,15 @@ int main(int argc, char **argv)
                            rhost, rport);
                 else
                 {
-                    reverse_client = cl;
-                    reverse_client->onHold = FALSE;
-                    rfbStartOnHoldClient(reverse_client);
-                    (void)newVncClient(reverse_client);
+                    reverseClient = cl;
+                    reverseClient->onHold = FALSE;
+                    rfbStartOnHoldClient(reverseClient);
+                    (void)newVncClient(reverseClient);
                 }
             }
         }
 
-        if (!reverse_client)
+        if (!reverseClient)
             while (vncscr->clientHead == NULL)
                 rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
 
