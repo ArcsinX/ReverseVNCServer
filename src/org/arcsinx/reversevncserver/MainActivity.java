@@ -275,6 +275,7 @@ public class MainActivity extends Activity {
 					Process sh = Runtime.getRuntime().exec("su", null, new File(files_dir));
 					OutputStream os = sh.getOutputStream();
 					writeCommand(os, kill_cmd);
+					writeCommand(os, "busybox " + kill_cmd);
 				}
 				catch (Exception e)
 				{}
