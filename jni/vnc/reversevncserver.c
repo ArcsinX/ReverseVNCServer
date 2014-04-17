@@ -290,8 +290,8 @@ static void TerminationHandler(int signo)
 {
     /* Prevent warning */
     (void)signo;
-    /* Perform cleanup */
     Cleanup();
+    exit(0);
 }
 
 
