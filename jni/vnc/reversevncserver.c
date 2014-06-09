@@ -10,6 +10,7 @@
  * General Public License for more details.
  */
 
+#define VERSION "1.3"
 #if 0
 #define DEBUG
 #endif
@@ -55,18 +56,118 @@ static volatile int vnc_is_active = FALSE;
 
 static void Cleanup();
 
-static void InjectKeyEvent(int code, int done)
+static void InjectKeyEvent(int code)
 {
-    if (done)
-    {
-        char keyevent_cmd[256];
-        sprintf(keyevent_cmd, "input keyevent %d", code);
-        system(keyevent_cmd);
+    char keyevent_cmd[256];
+    sprintf(keyevent_cmd, "input keyevent %d", code);
+    system(keyevent_cmd);
 
 #ifdef DEBUG
-        printf("injectKeyEvent code=%d\n", code);
+    printf("injectKeyEvent code=%d\n", code);
 #endif
+}
+
+static void InjectTextEvent(int code)
+{
+    char keyevent_cmd[256];
+    if ((char)code == '\'')
+    {
+        sprintf(keyevent_cmd, "input text \"%c\"", (char)code);
     }
+    else
+    {
+        sprintf(keyevent_cmd, "input text '%c'", (char)code);
+    }
+    system(keyevent_cmd);
+
+#ifdef DEBUG
+    printf("injectTextEvent code=%c\n", (char)code);
+#endif
+}
+
+static int KeySym2Text(rfbKeySym key)
+{
+    int code = (int)key;
+
+    if (code >= 0x61 && code <= 0x7a) /* a..z */
+    {
+        return 'a' + (code - 0x61);
+    }
+    if (code >= 0x41 && code <= 0x5a) /* A..Z */
+    {
+        return 'A' + (code - 0x41);
+    }
+    if (code >= 0x30 && code <= 0x39) /* 0 .. 9 */
+    {
+        return '0' + (code - 0x30);
+    }
+    switch (code)
+    {
+        case 0x3a:
+            return ':';
+        case 0x3b:
+            return ';';
+        case 0x3c:
+            return '<';
+        case 0x3d:
+            return '=';
+        case 0x3e:
+            return '>';
+        case 0x3f:
+            return '?';
+        case 0x40:
+            return '@';
+        case 0x21:
+            return '!';
+        case 0x22:
+            return '"';
+        case 0x23:
+            return '#';
+        case 0x24:
+            return '$';
+        case 0x25:
+            return '%';
+        case 0x26:
+            return '&';
+        case 0x27:
+            return '\'';
+        case 0x28:
+            return '(';
+        case 0x29:
+            return ')';
+        case 0x2b:
+            return '+';
+        case 0x2c:
+            return ',';
+        case 0x2d:
+            return '-';
+        case 0x2e:
+            return '.';
+        case 0x2f:
+            return '/';
+        case 0x5b:
+            return '[';
+        case 0x5c:
+            return '\\';
+        case 0x5d:
+            return ']';
+        case 0x5e:
+            return '^';
+        case 0x5f:
+            return '_';
+        case 0x60:
+            return '`';
+        case 0x7b:
+            return '{';
+        case 0x7c:
+            return '|';
+        case 0x7d:
+            return '}';
+        case 0x7e:
+            return '~';
+        
+    }
+    return 0;
 }
 
 static int KeySym2ScanCode(rfbKeySym key, rfbClientPtr cl)
@@ -74,14 +175,17 @@ static int KeySym2ScanCode(rfbKeySym key, rfbClientPtr cl)
     int scancode = 0;
 
     int code = (int)key;
+
     switch (code)
     {
+        case 0x0020:    scancode = AKEYCODE_SPACE;           break; // space
+        case 0x002A:    scancode = AKEYCODE_STAR;            break; // *
         case 0xFF0D:    scancode = AKEYCODE_ENTER;           break; // Enter
         case 0xFF51:    scancode = AKEYCODE_DPAD_LEFT;       break; // left 
         case 0xFF53:    scancode = AKEYCODE_DPAD_RIGHT;      break; // right
         case 0xFF54:    scancode = AKEYCODE_DPAD_DOWN;       break; // down
         case 0xFF52:    scancode = AKEYCODE_DPAD_UP;         break; // up
-        case 0xFF08:    scancode = AKEYCODE_BACK;            break; // Backspace
+        case 0xFF08:    scancode = AKEYCODE_DEL;             break; // Backspace
         case 0xFF1B:    scancode = AKEYCODE_BACK;            break; // ESC
         case 0xFF50:    scancode = AKEYCODE_HOME;            break; // Home
         case 0xFF55:    scancode = AKEYCODE_MENU;            break; // PgUp
@@ -89,6 +193,8 @@ static int KeySym2ScanCode(rfbKeySym key, rfbClientPtr cl)
         case 0xFFC7:    scancode = AKEYCODE_POWER;           break; // F10
         case 0xFFC8:    rfbShutdownServer(cl->screen,TRUE);  break; // F11
         case 0xFFC9:    vnc_is_active = FALSE;               break; // F12
+        case 0xFFFF:    scancode = AKEYCODE_FORWARD_DEL;     break; // DEL
+        case 0xFF6B:    scancode = AKEYCODE_BREAK;           break; // ctrl+c
     }
 
     return scancode;
@@ -103,11 +209,17 @@ static void KeyEvent(rfbBool down, rfbKeySym key, rfbClientPtr cl)
     printf("Got keysym: %04x (down=%d)\n", (unsigned int)key, (int)down);
 #endif
 
-    if ((scancode = KeySym2ScanCode(key, cl)))
+    if (down)
     {
-        InjectKeyEvent(scancode, down);
+        if ((scancode = KeySym2Text(key)))
+        {
+            InjectTextEvent(scancode);
+        }
+        else if ((scancode = KeySym2ScanCode(key, cl)))
+        {
+            InjectKeyEvent(scancode);
+        }
     }
-
 }
 
 static void InjectTapEvent(int x, int y)
@@ -307,6 +419,15 @@ int main(int argc, char **argv)
     int          reconnect_on_lost = FALSE;
 
     char        *fbdevice = NULL;
+
+    if (argc == 2)
+    {
+        if (strcmp(argv[1], "--version") == 0)
+        {
+            printf("%s\n", VERSION);
+            return 0;
+        }
+    }
 
     puts("User options set:");
     if (argc > 1)

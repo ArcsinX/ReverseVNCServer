@@ -11,6 +11,6 @@
     <string name="viewonlyStatic">View only (ROOT not required)</string>
     <string name="vncConnectStr"></string>
     <string name="httpConnectStr"></string>
-    <string name="version">1.2</string>
+    <string name="version">1.3</string>
 
 </resources>
