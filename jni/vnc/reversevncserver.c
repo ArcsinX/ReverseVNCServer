@@ -371,8 +371,9 @@ static void InitVncServer(int port, struct fb_var_screeninfo *scrinfo,
 
 static void PrintUsage(char **argv)
 {
-    printf("%s [-h] [-c host:port] [-r] [-v] [-p localport]\n"
+    printf("%s [-h] [-c host:port] [-t tries] [-r] [-v] [-p localport]\n"
         "-c host:port : Reverse connection host and port\n"
+        "-t tries : Number of tries for reverse connection\n"
         "-r : reconnect on reverse connections lost\n"
         "-v : view only\n"
         "-p localport : Local port for incoming connections (default is 5901)\n"
@@ -414,6 +415,7 @@ int main(int argc, char **argv)
     char rhost[256] = {0};
     int  rport      = 5500;
     int  port       = 5901;
+    int  tries      = 1;
 
     rfbClientPtr reverse_client    = NULL;
     int          reconnect_on_lost = FALSE;
@@ -452,6 +454,13 @@ int main(int argc, char **argv)
                         i++;
                         port = atoi(argv[i]);
                         printf("\tLocal port: %d\n", port);
+                        break;
+                    case 't':
+                        i++;
+                        tries = atoi(argv[i]);
+                        if (tries <= 0)
+                            tries = 1;
+                        printf("\tReverse connection tries: %d\n", tries);
                         break;
                     case 'r':
                         reconnect_on_lost = TRUE;
@@ -519,15 +528,26 @@ int main(int argc, char **argv)
 
     if (rhost[0] != '\0')
     {
-        reverse_client = rfbReverseConnection(vncscr, rhost, rport);
-        if (reverse_client == NULL)
-            printf("Couldn't connect to remote host: %s at port %d\n",
-                   rhost, rport);
-        else
+        for (; tries > 0; tries--)
         {
-            reverse_client->onHold = FALSE;
-            rfbStartOnHoldClient(reverse_client);
-            (void)NewVncClient(reverse_client);
+            reverse_client = rfbReverseConnection(vncscr, rhost, rport);
+            if (reverse_client == NULL)
+            {
+                fprintf(stderr, "Couldn't connect to remote host: %s at port %d\n",
+                       rhost, rport);
+            }
+            else
+            {
+                reverse_client->onHold = FALSE;
+                rfbStartOnHoldClient(reverse_client);
+                (void)NewVncClient(reverse_client);
+                break;
+            }
+        }
+        if (tries <= 0)
+        {
+            fprintf(stderr, "Reverse connection failure!\n");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -547,8 +567,10 @@ int main(int argc, char **argv)
             {
                 cl = rfbReverseConnection(vncscr, rhost, rport);
                 if (cl == NULL)
-                    printf("Couldn't connect to remote host: %s at port %d\n",
-                           rhost, rport);
+                {
+                    fprintf(stderr, "Couldn't connect to remote host: %s at port %d\n",
+                            rhost, rport);
+                }
                 else
                 {
                     reverse_client = cl;
