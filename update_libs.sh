@@ -1,6 +1,8 @@
 #!/bin/bash
-for i in libs/*; do
+cd libs
+for i in ./*; do
   if [[ -d $i && -e $i/reversevncserver ]];then
-    cp $i/reversevncserver $i/libreversevncserver.so;
+    mkdir -p ../app/src/main/jniLibs/$i
+    cp $i/reversevncserver ../app/src/main/jniLibs/$i/libreversevncserver.so;
   fi
 done
