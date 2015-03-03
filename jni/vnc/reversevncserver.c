@@ -33,7 +33,8 @@
 #include "framebuffer.h"
 
 /* Android already has 5900 bound natively. */
-#define VNC_PORT 5901
+#define VNC_PORT  5901
+#define VNC_RPORT 5500
 
 #ifndef TRUE
 #define TRUE 1
@@ -298,7 +299,7 @@ void ExtractHostPort(char *str, char *rhost, int *rport)
         }
         else if (*rport == 0)
         {
-            *rport = 5500;
+            *rport = VNC_RPORT;
         }
         *p = '\0';
     } 
@@ -413,8 +414,8 @@ int main(int argc, char **argv)
     int (*update_screen)() = NULL;
 
     char rhost[256] = {0};
-    int  rport      = 5500;
-    int  port       = 5901;
+    int  rport      = VNC_RPORT;
+    int  port       = VNC_PORT;
     int  tries      = 1;
 
     rfbClientPtr reverse_client    = NULL;
@@ -499,8 +500,9 @@ int main(int argc, char **argv)
     fbfd = InitFb(fbdevice);
     if (fbfd == -1)
     {
-        puts("Failed to initialize frame buffer");
-        exit(EXIT_FAILURE);
+        fprintf(stderr,
+                "Failed to initialize frame buffer (%s)\n", strerror(errno));
+        exit(errno);
     }
 
     vncbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
@@ -533,8 +535,8 @@ int main(int argc, char **argv)
             reverse_client = rfbReverseConnection(vncscr, rhost, rport);
             if (reverse_client == NULL)
             {
-                fprintf(stderr, "Couldn't connect to remote host: %s at port %d\n",
-                       rhost, rport);
+                fprintf(stderr, "Couldn't connect to remote host: %s at port %d (%s)\n",
+                       rhost, rport, strerror(errno));
             }
             else
             {
@@ -546,8 +548,10 @@ int main(int argc, char **argv)
         }
         if (tries <= 0)
         {
+#ifdef DEBUG
             fprintf(stderr, "Reverse connection failure!\n");
-            exit(EXIT_FAILURE);
+#endif
+            exit(errno);
         }
     }
 
@@ -568,8 +572,8 @@ int main(int argc, char **argv)
                 cl = rfbReverseConnection(vncscr, rhost, rport);
                 if (cl == NULL)
                 {
-                    fprintf(stderr, "Couldn't connect to remote host: %s at port %d\n",
-                            rhost, rport);
+                    fprintf(stderr, "Couldn't connect to remote host: %s at port %d (%s)\n",
+                            rhost, rport, strerror(errno));
                 }
                 else
                 {
@@ -588,7 +592,7 @@ int main(int argc, char **argv)
         rfbProcessEvents(vncscr, vncscr->deferUpdateTime * 1000);
         if (update_screen() == -1)
         {
-            puts("Failed to update screen");
+            fprintf(stderr, "Failed to update screen\n");
             Cleanup();
             exit(EXIT_FAILURE);
         }
