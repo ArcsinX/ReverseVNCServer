@@ -10,7 +10,7 @@
  * General Public License for more details.
  */
 
-#define VERSION "1.3"
+#define VERSION "1.4"
 #if 0
 #define DEBUG
 #endif
